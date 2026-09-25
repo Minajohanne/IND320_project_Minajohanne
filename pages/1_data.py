@@ -59,6 +59,8 @@ for col in plot_columns:
 
 tbl = pd.DataFrame(rows)
 
+st.subheader("Reservoir measurements during the first month")
+
 st.dataframe(
     tbl,
     column_config={

@@ -46,7 +46,7 @@ filtered_dat = dat[
 ]
 
 if selected_column == "All columns":
-    # Only numerical measurement columns are meaningful together
+
     plot_columns = [
         "fyllingsgrad",
         "kapasitet_TWh",
@@ -55,21 +55,36 @@ if selected_column == "All columns":
         "endring_fyllingsgrad",
     ]
 
+    # Make a copy so the original filtered data is not changed
+    scaled_dat = filtered_dat.copy()
+
+    # Scale each measurement between 0 and 1
+    for col in plot_columns:
+        col_min = scaled_dat[col].min()
+        col_max = scaled_dat[col].max()
+
+        scaled_dat[col] = (
+            (scaled_dat[col] - col_min) /
+            (col_max - col_min)
+        )
+
+    # Plot the scaled measurements together
     fig = px.line(
-        filtered_dat,
+        scaled_dat,
         x="dato_Id",
         y=plot_columns,
-        title="Reservoir measurements over time",
+        title="Scaled reservoir measurements over time",
     )
 
     fig.update_layout(
         xaxis_title="Date",
-        yaxis_title="Value",
+        yaxis_title="Scaled value",
         legend_title="Variable",
         template="plotly_white",
     )
 
 else:
+
     fig = px.line(
         filtered_dat,
         x="dato_Id",
@@ -84,7 +99,3 @@ else:
     )
 
 st.plotly_chart(fig, width="stretch")
-
-# endre navn på variabler? kan man bruke det som er gjort i notebooken?
-# hvordan plotte kategoriske variabler? 
-# del 1 av innleveringen - calculator - skal jeg fjerne den? 
