@@ -99,7 +99,7 @@ else:
         filtered_dat,
         x="dato_Id",
         y=selected_column,
-        color="area_number",
+        color="omrnr",
         title=f"{selected_column} over time",
     )
 
