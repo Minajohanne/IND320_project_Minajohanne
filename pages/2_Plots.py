@@ -32,6 +32,7 @@ selected_column = st.selectbox(
 # month selecetion for the select_slider
 months = dat["month"].unique().tolist()
 
+# select_slider
 selected_months = st.select_slider(
     "Select month range",
     options=months,
@@ -45,8 +46,8 @@ filtered_dat = dat[
     (dat["month"] <= end_month)
 ]
 
+# Plot all measurement columns
 if selected_column == "All columns":
-
     plot_columns = [
         "fyllingsgrad",
         "kapasitet_TWh",
@@ -55,10 +56,19 @@ if selected_column == "All columns":
         "endring_fyllingsgrad",
     ]
 
-    # Make a copy so the original filtered data is not changed
-    scaled_dat = filtered_dat.copy()
+    # There are multiple observations for each date.
+    # Calculate the mean to get one value per date for each measurement.
+    plot_data = (
+        filtered_dat
+        .groupby("dato_Id")[plot_columns]
+        .mean()
+        .reset_index()
+    )
 
-    # Scale each measurement between 0 and 1
+    # Make a copy so plot_data is not changed
+    scaled_dat = plot_data.copy()
+
+    # Min-max scaling of each measurement
     for col in plot_columns:
         col_min = scaled_dat[col].min()
         col_max = scaled_dat[col].max()
@@ -84,11 +94,12 @@ if selected_column == "All columns":
     )
 
 else:
-
+    # Plot the selected column without averaging across areas
     fig = px.line(
         filtered_dat,
         x="dato_Id",
         y=selected_column,
+        color="area_number",
         title=f"{selected_column} over time",
     )
 
@@ -97,5 +108,3 @@ else:
         yaxis_title=selected_column,
         template="plotly_white",
     )
-
-st.plotly_chart(fig, width="stretch")

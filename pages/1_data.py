@@ -32,15 +32,7 @@ st.dataframe(
     width="stretch"
 )
 
-# Variables for which a line chart is meaningful
-plot_columns = [
-    "fyllingsgrad",
-    "kapasitet_TWh",
-    "fylling_TWh",
-    "fyllingsgrad_forrige_uke",
-    "endring_fyllingsgrad",
-]
-
+# Numerical measurement variables for line chart is meaningful
 plot_columns = [
     "fyllingsgrad",
     "kapasitet_TWh",
@@ -57,10 +49,12 @@ for col in plot_columns:
         "first_month": first_month[col].tolist()
     })
 
+# creating dataframe with measurement variables
 tbl = pd.DataFrame(rows)
 
 st.subheader("Reservoir measurements during the first month")
 
+# displaying the first month of data using line charts
 st.dataframe(
     tbl,
     column_config={
