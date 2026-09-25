@@ -41,24 +41,24 @@ plot_columns = [
     "endring_fyllingsgrad",
 ]
 
-# One table row for each column in the original CSV file
+plot_columns = [
+    "fyllingsgrad",
+    "kapasitet_TWh",
+    "fylling_TWh",
+    "fyllingsgrad_forrige_uke",
+    "endring_fyllingsgrad",
+]
+
 rows = []
 
-for col in dat.columns:
-
-    if col in plot_columns:
-        values = first_month[col].tolist()
-    else:
-        values = None
-
+for col in plot_columns:
     rows.append({
         "variable": col,
-        "first_month": values
+        "first_month": first_month[col].tolist()
     })
 
 tbl = pd.DataFrame(rows)
 
-# Display the first month as a table with rowwise line charts
 st.dataframe(
     tbl,
     column_config={
@@ -68,7 +68,5 @@ st.dataframe(
         ),
     },
     hide_index=True,
+    width="stretch"
 )
-
-
-# data table 
