@@ -86,3 +86,5 @@ else:
 st.plotly_chart(fig, width="stretch")
 
 # endre navn på variabler? kan man bruke det som er gjort i notebooken?
+# hvordan plotte kategoriske variabler? 
+# del 1 av innleveringen - calculator - skal jeg fjerne den? 

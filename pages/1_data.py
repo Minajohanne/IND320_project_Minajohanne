@@ -23,17 +23,37 @@ first_month = dat[
     (dat["dato_Id"].dt.month == first_date.month)
 ] 
 
-# one table row for each column in the original CSV file 
+# Display all observations from the first month
+st.subheader("Data from the first month")
+
+st.dataframe(
+    first_month,
+    hide_index=True,
+    width="stretch"
+)
+
+# Variables for which a line chart is meaningful
+plot_columns = [
+    "fyllingsgrad",
+    "kapasitet_TWh",
+    "fylling_TWh",
+    "fyllingsgrad_forrige_uke",
+    "endring_fyllingsgrad",
+]
+
+# One table row for each column in the original CSV file
 rows = []
-for col in dat.columns: 
-    # LineChartColumn requires numeric values 
-    if pd.api.types.is_numeric_dtype(dat[col]):
+
+for col in dat.columns:
+
+    if col in plot_columns:
         values = first_month[col].tolist()
-    else: 
-        values = None 
+    else:
+        values = None
+
     rows.append({
-        "variable" : col,
-        "first_month" : values
+        "variable": col,
+        "first_month": values
     })
 
 tbl = pd.DataFrame(rows)
@@ -51,6 +71,4 @@ st.dataframe(
 )
 
 
-# flere observasjoner på samme dato?? 
-# hva skal jeg gjøre med kategoriske variabler? 
-# er main.py side 1? 
+# data table 
