@@ -108,3 +108,6 @@ else:
         yaxis_title=selected_column,
         template="plotly_white",
     )
+
+
+st.plotly_chart(fig, width="stretch")
