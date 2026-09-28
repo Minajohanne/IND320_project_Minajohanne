@@ -56,7 +56,6 @@ if selected_column == "All columns":
         "endring_fyllingsgrad",
     ]
 
-    # There are multiple observations for each date.
     # Calculate the mean to get one value per date for each measurement.
     plot_data = (
         filtered_dat
@@ -94,7 +93,7 @@ if selected_column == "All columns":
     )
 
 else:
-    # Plot the selected column without averaging across areas
+    # Plot the selected column without 
     fig = px.line(
         filtered_dat,
         x="dato_Id",
