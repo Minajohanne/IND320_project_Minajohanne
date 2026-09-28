@@ -18,7 +18,6 @@ dat = dat.sort_values("dato_Id")
 
 # create year-month values for the select_slider
 dat["month"] = dat["dato_Id"].dt.to_period("M").astype(str)
-print(dat["month"])
 
 # columns to choose from in the selectbox 
 csv_cols = [col for col in dat.columns if col != "month"]
@@ -93,7 +92,7 @@ if selected_column == "All columns":
     )
 
 else:
-    # Plot the selected column without 
+    # Plot the selected column  
     fig = px.line(
         filtered_dat,
         x="dato_Id",
