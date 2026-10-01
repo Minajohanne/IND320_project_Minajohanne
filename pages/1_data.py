@@ -32,7 +32,7 @@ st.dataframe(
     width="stretch"
 )
 
-# Numerical measurement variables for line chart is meaningful
+# Numerical measurement variables for line chart 
 plot_columns = [
     "fyllingsgrad",
     "kapasitet_TWh",
