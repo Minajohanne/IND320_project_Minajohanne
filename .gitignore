@@ -220,3 +220,6 @@ __marimo__/
 .DS_Store
 *.html
 *.pdf
+
+# Ignore the No_sync directory
+No_sync/
