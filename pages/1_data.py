@@ -1,15 +1,18 @@
 import pandas as pd 
 import streamlit as st 
+from utils.api import get_reservoir_data
 
 st.title("Reservoir data table")
 
 @st.cache_data
-def load_data(file):
-    """Read reservoir data from the local CSV file."""
-    return pd.read_csv(file)
+def load_data(url: str):
+    return get_reservoir_data(url)
 
- # reading the data 
-dat = load_data("data/reservoirs.csv")
+url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
+
+dat = load_data(url)
+
+st.dataframe(dat)
 
 # converting "dato_Id" to a datetime object 
 dat["dato_Id"] = pd.to_datetime(dat["dato_Id"]) 
