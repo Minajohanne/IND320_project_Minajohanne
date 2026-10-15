@@ -1,33 +1,43 @@
-import pandas as pd 
-import streamlit as st 
-from utils.api import get_reservoir_data
+import pandas as pd
+import streamlit as st
+from utils.reservoir import load_reservoir_data
 
 st.title("Reservoir data table")
 
-@st.cache_data
-def load_data(url: str):
-    return get_reservoir_data(url)
-
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
-dat = load_data(url)
+dat = load_reservoir_data(url).copy()
 
-st.dataframe(dat)
+# Ensure date column is datetime
+dat["Date"] = pd.to_datetime(dat["Date"])
 
-# converting "dato_Id" to a datetime object 
-dat["dato_Id"] = pd.to_datetime(dat["dato_Id"]) 
-dat = dat.sort_values("dato_Id")
+# Sort by date
+dat = dat.sort_values("Date")
 
-# find the first month of data 
-first_date = dat["dato_Id"].min() 
+# Select area type
+selected_area = st.radio(
+    "Select area type",
+    options=["EL", "NO", "VASS"],
+    horizontal=True
+)
 
-first_month = dat[
-    (dat["dato_Id"].dt.year == first_date.year) &
-    (dat["dato_Id"].dt.month == first_date.month)
-] 
+# Filter by area type
+area_dat = dat[dat["Area type"] == selected_area].copy()
 
-# Display all observations from the first month
-st.subheader("Data from the first month")
+if area_dat.empty:
+    st.warning("No data available for the selected area type.")
+    st.stop()
+
+# Find the first month in the dataset
+first_month_date = area_dat["Date"].min().to_period("M")
+
+# Filter data from the first month
+first_month = area_dat[
+    area_dat["Date"].dt.to_period("M") == first_month_date
+].copy()
+
+# Display data
+st.subheader(f"Data from {first_month_date}")
 
 st.dataframe(
     first_month,
@@ -35,37 +45,47 @@ st.dataframe(
     width="stretch"
 )
 
-# Numerical measurement variables for line chart 
+# Numerical measurement variables for line charts
 plot_columns = [
-    "fyllingsgrad",
-    "kapasitet_TWh",
-    "fylling_TWh",
-    "fyllingsgrad_forrige_uke",
-    "endring_fyllingsgrad",
+    "Filling level",
+    "Capacity (TWh)",
+    "Stored Energy (TWh)",
+    "Filling level previous week",
+    "Change in filling level",
 ]
 
+# Create one row per area number
 rows = []
 
-for col in plot_columns:
-    rows.append({
-        "variable": col,
-        "first_month": first_month[col].tolist()
-    })
+for area_number, group in first_month.groupby("Area number"):
+    group = group.sort_values("Date")
 
-# creating dataframe with measurement variables
+    row = {"Area number": area_number}
+
+    for col in plot_columns:
+        row[col] = group[col].tolist()
+
+    rows.append(row)
+
+# Create DataFrame
 tbl = pd.DataFrame(rows)
 
 st.subheader("Reservoir measurements during the first month")
 
-# displaying the first month of data using line charts
+# Configure line chart columns
+column_config = {
+    "Area number": "Area number"
+}
+
+for col in plot_columns:
+    column_config[col] = st.column_config.LineChartColumn(
+        col
+    )
+
+# Display table
 st.dataframe(
     tbl,
-    column_config={
-        "variable": "Variable",
-        "first_month": st.column_config.LineChartColumn(
-            "First month"
-        ),
-    },
+    column_config=column_config,
     hide_index=True,
     width="stretch"
 )

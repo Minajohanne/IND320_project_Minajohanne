@@ -1,87 +1,101 @@
-import pandas as pd 
-import streamlit as st 
-import plotly.express as px 
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+from utils.reservoir import load_reservoir_data
 
 st.title("Reservoir data plot")
 
-@st.cache_data
-def load_data(file):
-    """Read reservoir data from the local CSV file."""
-    return pd.read_csv(file)
+url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
-# reading the data 
-dat = load_data("data/reservoirs.csv") 
+# Read data from the API
+dat = load_reservoir_data(url).copy()
 
-# converting "dato_Id" to a datetime object 
-dat["dato_Id"] = pd.to_datetime(dat["dato_Id"]) 
-dat = dat.sort_values("dato_Id")
+# Convert date column and sort
+dat["Date"] = pd.to_datetime(dat["Date"])
+dat = dat.sort_values("Date")
 
-# create year-month values for the select_slider
-dat["month"] = dat["dato_Id"].dt.to_period("M").astype(str)
+# Create year-month values for the select_slider
+dat["month"] = dat["Date"].dt.to_period("M").astype(str)
 
-# columns to choose from in the selectbox 
-csv_cols = [col for col in dat.columns if col != "month"]
-options = ["All columns"] + csv_cols
+# Numerical measurement variables
+plot_columns = [
+    "Filling level",
+    "Capacity (TWh)",
+    "Stored Energy (TWh)",
+    "Filling level previous week",
+    "Change in filling level",
+]
 
+# Select measurement variable
 selected_column = st.selectbox(
-    "select a variable",
-    options 
-) # columns that the used choose 
-
-# month selecetion for the select_slider
-months = dat["month"].unique().tolist()
-
-# select_slider
-selected_months = st.select_slider(
-    "Select month range",
-    options=months,
-    value=(months[0], months[0])
+    "Select a variable",
+    ["All columns"] + plot_columns
 )
 
-# month range 
-start_month, end_month = selected_months
-filtered_dat = dat[
-    (dat["month"] >= start_month) &
-    (dat["month"] <= end_month)
-]
+# Select area type
+selected_area = st.radio(
+    "Select area type",
+    options=["EL", "NO", "VASS"],
+    horizontal=True
+)
+
+# Filter by area type
+area_dat = dat[dat["Area type"] == selected_area].copy()
+
+# Available months
+months = dat["month"].unique().tolist()
+
+# Select month range
+start_month, end_month = st.select_slider(
+    "Select month range",
+    options=months,
+    value=(months[0], months[-1])
+)
+
+# Filter by selected month range
+filtered_dat = area_dat[
+    (area_dat["month"] >= start_month) &
+    (area_dat["month"] <= end_month)
+].copy()
+
+# Check if data is available
+if filtered_dat.empty:
+    st.warning("No data available for the selected interval.")
+    st.stop()
 
 # Plot all measurement columns
 if selected_column == "All columns":
-    plot_columns = [
-        "fyllingsgrad",
-        "kapasitet_TWh",
-        "fylling_TWh",
-        "fyllingsgrad_forrige_uke",
-        "endring_fyllingsgrad",
-    ]
 
-    # Calculate the mean to get one value per date for each measurement.
+    # Calculate mean values for each date
     plot_data = (
         filtered_dat
-        .groupby("dato_Id")[plot_columns]
+        .groupby("Date")[plot_columns]
         .mean()
         .reset_index()
     )
 
-    # Make a copy so plot_data is not changed
+    # Make a copy for scaling
     scaled_dat = plot_data.copy()
 
-    # Min-max scaling of each measurement
+    # Min-max scaling
     for col in plot_columns:
         col_min = scaled_dat[col].min()
         col_max = scaled_dat[col].max()
 
-        scaled_dat[col] = (
-            (scaled_dat[col] - col_min) /
-            (col_max - col_min)
-        )
+        if col_max != col_min:
+            scaled_dat[col] = (
+                (scaled_dat[col] - col_min) /
+                (col_max - col_min)
+            )
+        else:
+            scaled_dat[col] = 0.0
 
-    # Plot the scaled measurements together
+    # Plot scaled measurements together
     fig = px.line(
         scaled_dat,
-        x="dato_Id",
+        x="Date",
         y=plot_columns,
-        title="Scaled reservoir measurements over time",
+        title=f"Average scaled reservoir measurements ({selected_area})",
     )
 
     fig.update_layout(
@@ -92,20 +106,23 @@ if selected_column == "All columns":
     )
 
 else:
-    # Plot the selected column  
+
+    # Plot selected measurement for each area number
     fig = px.line(
         filtered_dat,
-        x="dato_Id",
+        x="Date",
         y=selected_column,
-        color="omrnr",
-        title=f"{selected_column} over time",
+        color="Area number",
+        title=f"{selected_column} over time ({selected_area})",
     )
 
     fig.update_layout(
         xaxis_title="Date",
         yaxis_title=selected_column,
+        legend_title="Area number",
         template="plotly_white",
     )
 
-
+# Display plot
 st.plotly_chart(fig, width="stretch")
+
