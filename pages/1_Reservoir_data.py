@@ -16,7 +16,7 @@ dat = dat.sort_values("Date")
 
 # Select area type
 selected_area = st.radio(
-    "Select area type",
+    "Select area type:",
     options=["EL", "NO", "VASS"],
     horizontal=True
 )
@@ -78,10 +78,21 @@ column_config = {
 }
 
 for col in plot_columns:
-    column_config[col] = st.column_config.LineChartColumn(
-        col
-    )
 
+    if col == "Capacity (TWh)":
+        capacity_max = first_month[col].max()
+
+        column_config[col] = st.column_config.LineChartColumn(
+            col,
+            y_min=0,
+            y_max=max(float(capacity_max) * 1.1, 1.0)
+        )
+
+    else:
+        column_config[col] = st.column_config.LineChartColumn(
+            col
+        )
+        
 # Display table
 st.dataframe(
     tbl,

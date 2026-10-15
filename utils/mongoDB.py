@@ -14,7 +14,7 @@ def load_electricity_data():
     client = get_mongo_client()
 
     db = client["IND320"]
-    collection = db["crossborder_flows"]
+    collection = db["crossboarder_flows"]
 
     # Return a list of all documents in the collection, excluding the _id field
     return list(collection.find({}, {"_id": 0}))

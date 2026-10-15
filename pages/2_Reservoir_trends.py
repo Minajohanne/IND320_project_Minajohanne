@@ -3,12 +3,20 @@ import streamlit as st
 import plotly.express as px
 from utils.reservoir import load_reservoir_data
 
-st.title("Reservoir data plot")
+st.title("Reservoir Trends")
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
+
+# Load and cache reservoir data from the NVE API
+@st.cache_data(ttl=3600)
+def load_data(url: str) -> pd.DataFrame:
+    """Load reservoir statistics from the NVE API."""
+    return load_reservoir_data(url)
+
+
 # Read data from the API
-dat = load_reservoir_data(url).copy()
+dat = load_data(url).copy()
 
 # Convert date column and sort
 dat["Date"] = pd.to_datetime(dat["Date"])
@@ -28,13 +36,13 @@ plot_columns = [
 
 # Select measurement variable
 selected_column = st.selectbox(
-    "Select a variable",
-    ["All columns"] + plot_columns
+    "Select a variable:",
+    options=["All columns"] + plot_columns
 )
 
 # Select area type
 selected_area = st.radio(
-    "Select area type",
+    "Select area type:",
     options=["EL", "NO", "VASS"],
     horizontal=True
 )
@@ -47,7 +55,7 @@ months = dat["month"].unique().tolist()
 
 # Select month range
 start_month, end_month = st.select_slider(
-    "Select month range",
+    "Select month range:",
     options=months,
     value=(months[0], months[-1])
 )
@@ -62,6 +70,7 @@ filtered_dat = area_dat[
 if filtered_dat.empty:
     st.warning("No data available for the selected interval.")
     st.stop()
+
 
 # Plot all measurement columns
 if selected_column == "All columns":
@@ -82,7 +91,7 @@ if selected_column == "All columns":
         col_min = scaled_dat[col].min()
         col_max = scaled_dat[col].max()
 
-        if col_max != col_min:
+        if pd.notna(col_min) and pd.notna(col_max) and col_max != col_min:
             scaled_dat[col] = (
                 (scaled_dat[col] - col_min) /
                 (col_max - col_min)
@@ -107,9 +116,18 @@ if selected_column == "All columns":
 
 else:
 
+    # Prepare data for plotting each area number separately
+    plot_dat = filtered_dat.copy()
+
+    # Treat area numbers as categorical variables
+    plot_dat["Area number"] = plot_dat["Area number"].astype(str)
+
+    # Sort by area number and date
+    plot_dat = plot_dat.sort_values(["Area number", "Date"])
+
     # Plot selected measurement for each area number
     fig = px.line(
-        filtered_dat,
+        plot_dat,
         x="Date",
         y=selected_column,
         color="Area number",
@@ -123,6 +141,6 @@ else:
         template="plotly_white",
     )
 
+
 # Display plot
 st.plotly_chart(fig, width="stretch")
-
