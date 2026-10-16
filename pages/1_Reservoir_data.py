@@ -8,12 +8,6 @@ url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentli
 
 dat = load_reservoir_data(url).copy()
 
-# Ensure date column is datetime
-dat["Date"] = pd.to_datetime(dat["Date"])
-
-# Sort by date
-dat = dat.sort_values("Date")
-
 # Select area type
 selected_area = st.radio(
     "Select area type:",

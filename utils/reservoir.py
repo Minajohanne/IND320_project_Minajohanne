@@ -63,8 +63,6 @@ def map_names(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-import pandas as pd
-import streamlit as st
 
 @st.cache_data
 def load_reservoir_data(url: str) -> pd.DataFrame:
