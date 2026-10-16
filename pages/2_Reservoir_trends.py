@@ -7,11 +7,8 @@ st.title("Reservoir Trends")
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
+# loading the data 
 dat = load_reservoir_data(url)
-
-# Convert date column and sort
-dat["Date"] = pd.to_datetime(dat["Date"])
-dat = dat.sort_values("Date")
 
 # Create year-month values for the select_slider
 dat["month"] = dat["Date"].dt.to_period("M").astype(str)
