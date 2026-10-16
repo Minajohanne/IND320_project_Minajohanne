@@ -6,17 +6,8 @@ import certifi
 @st.cache_resource
 def get_mongo_client():
     """Establish a connection to MongoDB Atlas."""
-    client = MongoClient(
-        st.secrets["mongo_uri"],
-        tls=True,
-        tlsCAFile=certifi.where(),
-        serverSelectionTimeoutMS=30000,
-        connectTimeoutMS=20000
-    )
-
-    client.admin.command("ping")
+    client = MongoClient(st.secrets["mongo_uri"])
     return client
-
 
 @st.cache_data
 def load_electricity_data():
