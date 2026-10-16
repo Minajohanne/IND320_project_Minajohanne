@@ -7,20 +7,8 @@ st.title("Reservoir Trends")
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
-
-# Load and cache reservoir data from the NVE API
-@st.cache_data(ttl=3600)
-def load_data(url: str) -> pd.DataFrame:
-    """Load reservoir statistics from the NVE API."""
-    return load_reservoir_data(url)
-
-
-# Read data from the API
-dat = load_data(url).copy()
-
-# Convert date column and sort
-dat["Date"] = pd.to_datetime(dat["Date"])
-dat = dat.sort_values("Date")
+# loading the data 
+dat = load_reservoir_data(url)
 
 # Create year-month values for the select_slider
 dat["month"] = dat["Date"].dt.to_period("M").astype(str)
@@ -86,18 +74,14 @@ if selected_column == "All columns":
     # Make a copy for scaling
     scaled_dat = plot_data.copy()
 
-    # Min-max scaling
+    # Reverse min-max scaling
     for col in plot_columns:
         col_min = scaled_dat[col].min()
         col_max = scaled_dat[col].max()
 
-        if pd.notna(col_min) and pd.notna(col_max) and col_max != col_min:
-            scaled_dat[col] = (
-                (scaled_dat[col] - col_min) /
-                (col_max - col_min)
-            )
-        else:
-            scaled_dat[col] = 0.0
+        scaled_dat[col] = (
+            scaled_dat[col] * (col_max - col_min) + col_min
+        )
 
     # Plot scaled measurements together
     fig = px.line(
