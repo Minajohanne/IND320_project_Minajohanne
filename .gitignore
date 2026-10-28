@@ -223,3 +223,7 @@ __marimo__/
 
 # Ignore the No_sync directory
 No_sync/
+
+# API cache
+.cache.sqlite
+.cache.sqlite-*
