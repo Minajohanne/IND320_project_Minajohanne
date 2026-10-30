@@ -1,3 +1,4 @@
+
 import pandas as pd
 import streamlit as st
 import plotly.express as px
@@ -7,10 +8,10 @@ st.title("Reservoir Trends")
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
-# loading the data 
-dat = load_reservoir_data(url)
+# Load reservoir data
+dat = load_reservoir_data(url).copy()
 
-# Create year-month values for the select_slider
+# Create year-month values
 dat["month"] = dat["Date"].dt.to_period("M").astype(str)
 
 # Numerical measurement variables
@@ -22,29 +23,78 @@ plot_columns = [
     "Change in filling level",
 ]
 
+# Area descriptions
+area_names = {
+    "EL": {
+        1: "NO1 - South-East",
+        2: "NO2 - South-West",
+        3: "NO3 - Central Norway",
+        4: "NO4 - Northern Norway",
+        5: "NO5 - Western Norway",
+    },
+    "NO": {
+        0: "Whole Norway",
+    },
+    "VASS": {
+        1: "Eastern Norway, Agder and parts of Rogaland",
+        2: "Western Norway",
+        3: "Central Norway and southern Nordland",
+    },
+}
+
 # Select measurement variable
 selected_column = st.selectbox(
     "Select a variable:",
     options=["All columns"] + plot_columns
 )
 
+# Restore previously selected area type
+if "area_type" not in st.session_state:
+    st.session_state["area_type"] = "EL"
+
 # Select area type
 selected_area = st.radio(
     "Select area type:",
     options=["EL", "NO", "VASS"],
-    horizontal=True
+    horizontal=True,
+    key="area_type"
 )
 
-# Filter by selected area type
-area_dat = dat[dat["Area type"] == selected_area].copy()
+# Filter by area type
+area_dat = dat[
+    dat["Area type"] == selected_area
+].copy()
 
-# Get available area numbers
-area_numbers = sorted(area_dat["Area number"].dropna().unique())
+if area_dat.empty:
+    st.warning("No data available for the selected area type.")
+    st.stop()
+
+# Find available area numbers
+area_numbers = sorted(
+    area_dat["Area number"].dropna().astype(int).unique()
+)
+
+# Preserve the selected number when valid for this area type
+previous_number = st.session_state.get("area_number")
+
+if previous_number not in area_numbers:
+    st.session_state["area_number"] = area_numbers[0]
 
 # Select area number
 selected_area_number = st.selectbox(
     "Select area number:",
-    options=area_numbers
+    options=area_numbers,
+    format_func=lambda number: (
+        f"{number} - "
+        f"{area_names.get(selected_area, {}).get(number, 'Unknown area')}"
+    ),
+    key="area_number"
+)
+
+# Store the selected area independently of widget state
+st.session_state["selected_reservoir_area"] = (
+    selected_area,
+    int(selected_area_number)
 )
 
 # Filter by selected area number
@@ -52,11 +102,12 @@ area_dat = area_dat[
     area_dat["Area number"] == selected_area_number
 ].copy()
 
-# Filter by area type
-area_dat = dat[dat["Area type"] == selected_area].copy()
-
 # Available months
-months = dat["month"].unique().tolist()
+months = sorted(area_dat["month"].dropna().unique().tolist())
+
+if not months:
+    st.warning("No monthly data available for the selected area.")
+    st.stop()
 
 # Select month range
 start_month, end_month = st.select_slider(
@@ -67,15 +118,21 @@ start_month, end_month = st.select_slider(
 
 # Filter by selected month range
 filtered_dat = area_dat[
-    (area_dat["month"] >= start_month) &
-    (area_dat["month"] <= end_month)
+    (area_dat["month"] >= start_month)
+    & (area_dat["month"] <= end_month)
 ].copy()
 
-# Check if data is available
+# Sort data chronologically
+filtered_dat = filtered_dat.sort_values("Date")
+
 if filtered_dat.empty:
     st.warning("No data available for the selected interval.")
     st.stop()
 
+# Get area description
+area_description = area_names.get(
+    selected_area, {}
+).get(selected_area_number, "Unknown area")
 
 # Plot all measurement columns
 if selected_column == "All columns":
@@ -88,60 +145,51 @@ if selected_column == "All columns":
         .reset_index()
     )
 
-    # Make a copy for scaling
+    # Apply min-max scaling
     scaled_dat = plot_data.copy()
 
-    # Reverse min-max scaling
     for col in plot_columns:
         col_min = scaled_dat[col].min()
         col_max = scaled_dat[col].max()
 
-        scaled_dat[col] = (
-            scaled_dat[col] * (col_max - col_min) + col_min
-        )
+        if col_max != col_min:
+            scaled_dat[col] = (
+                (scaled_dat[col] - col_min)
+                / (col_max - col_min)
+            )
+        else:
+            scaled_dat[col] = 0.0
 
-    # Plot scaled measurements together
+    # Plot scaled measurements
     fig = px.line(
         scaled_dat,
         x="Date",
         y=plot_columns,
-        title=f"Average scaled reservoir measurements ({selected_area})",
+        title=f"Scaled reservoir measurements - {area_description}",
     )
 
     fig.update_layout(
         xaxis_title="Date",
-        yaxis_title="Scaled value",
+        yaxis_title="Scaled value (0-1)",
         legend_title="Variable",
         template="plotly_white",
     )
 
 else:
 
-    # Prepare data for plotting each area number separately
-    plot_dat = filtered_dat.copy()
-
-    # Treat area numbers as categorical variables
-    plot_dat["Area number"] = plot_dat["Area number"].astype(str)
-
-    # Sort by area number and date
-    plot_dat = plot_dat.sort_values(["Area number", "Date"])
-
-    # Plot selected measurement for each area number
+    # Plot selected measurement
     fig = px.line(
-        plot_dat,
+        filtered_dat,
         x="Date",
         y=selected_column,
-        color="Area number",
-        title=f"{selected_column} over time ({selected_area})",
+        title=f"{selected_column} over time - {area_description}",
     )
 
     fig.update_layout(
         xaxis_title="Date",
         yaxis_title=selected_column,
-        legend_title="Area number",
         template="plotly_white",
     )
-
 
 # Display plot
 st.plotly_chart(fig, width="stretch")
