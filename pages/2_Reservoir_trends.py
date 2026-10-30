@@ -35,6 +35,23 @@ selected_area = st.radio(
     horizontal=True
 )
 
+# Filter by selected area type
+area_dat = dat[dat["Area type"] == selected_area].copy()
+
+# Get available area numbers
+area_numbers = sorted(area_dat["Area number"].dropna().unique())
+
+# Select area number
+selected_area_number = st.selectbox(
+    "Select area number:",
+    options=area_numbers
+)
+
+# Filter by selected area number
+area_dat = area_dat[
+    area_dat["Area number"] == selected_area_number
+].copy()
+
 # Filter by area type
 area_dat = dat[dat["Area type"] == selected_area].copy()
 
