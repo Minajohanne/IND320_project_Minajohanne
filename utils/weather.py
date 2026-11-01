@@ -42,7 +42,7 @@ def get_area_coordinates(
             point
             for region in el_coordinates.values()
             for point in region
-        ] # ? 
+        ] 
 
     elif area_type == "VASS":
         vass_regions = {
