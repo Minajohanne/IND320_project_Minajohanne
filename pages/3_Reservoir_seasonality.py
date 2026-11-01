@@ -1,10 +1,10 @@
-
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
 from utils.reservoir import load_reservoir_data
 from utils.analysis import plot_stl, plot_spectrogram
+from utils.area_selector import select_reservoir_area
 
 
 st.title("Seasonal Analysis")
@@ -19,69 +19,22 @@ st.write(
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 dat = load_reservoir_data(url).copy()
 
-# Area descriptions
-area_names = {
-    "EL": {
-        1: "NO1 - South-East",
-        2: "NO2 - South-West",
-        3: "NO3 - Central Norway",
-        4: "NO4 - Northern Norway",
-        5: "NO5 - Western Norway",
-    },
-    "NO": {
-        0: "Whole Norway",
-    },
-      "VASS": {
-        1: "Eastern Norway",
-        2: "Western Norway",
-        3: "Northern Norway",
-    },
-}
 
-# Select area type
-if "area_type" not in st.session_state:
-    st.session_state["area_type"] = "NO"
-
-selected_area = st.radio(
-    "Select area type:",
-    options=["EL", "NO", "VASS"],
-    horizontal=True,
-    key="area_type"
-)
-
-area_dat = dat[dat["Area type"] == selected_area].copy()
-
-if area_dat.empty:
-    st.warning("No data available for this area type.")
-    st.stop()
-
-# Select area number
-area_numbers = sorted(
-    area_dat["Area number"].dropna().astype(int).unique()
-)
-
-if st.session_state.get("area_number") not in area_numbers:
-    st.session_state["area_number"] = area_numbers[0]
-
-selected_area_number = st.selectbox(
-    "Select area number:",
-    options=area_numbers,
-    format_func=lambda number: (
-        f"{number} - {area_names.get(selected_area, {}).get(number, 'Unknown area')}"
-    ),
-    key="area_number"
-)
-
-# Save selected area for other pages
-st.session_state["selected_reservoir_area"] = (
-    selected_area,
-    int(selected_area_number)
-)
+# Shared area selector
+selected_area, selected_area_number = select_reservoir_area()
 
 # Filter by selected area
-filtered_dat = area_dat[
-    area_dat["Area number"] == selected_area_number
+filtered_dat = dat[
+    (dat["Area type"] == selected_area)
+    & (dat["Area number"] == selected_area_number)
 ].copy()
+
+if filtered_dat.empty:
+    st.warning("No data available for the selected area.")
+    st.stop()
+
+filtered_dat = filtered_dat.sort_values("Date")
+
 
 filtered_dat = filtered_dat.sort_values("Date")
 

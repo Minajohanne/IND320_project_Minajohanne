@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
@@ -11,6 +10,7 @@ from utils.analysis import (
     plot_precipitation_spc,
     plot_temperature_lof,
 )
+from utils.area_selector import select_reservoir_area
 
 
 st.title("Weather Outlier and Anomaly Analysis")
@@ -31,56 +31,10 @@ def load_region_coordinates():
 
 el_coordinates, nve_coordinates = load_region_coordinates()
 
-# Area descriptions
-area_names = {
-    "EL": {
-        1: "NO1 - South-East",
-        2: "NO2 - South-West",
-        3: "NO3 - Central Norway",
-        4: "NO4 - Northern Norway",
-        5: "NO5 - Western Norway",
-    },
-    "NO": {
-        0: "Whole Norway",
-    },
-    "VASS": {
-        1: "Eastern Norway",
-        2: "Western Norway",
-        3: "Northern Norway",
-    },
-}
+# Shared area selector
+selected_area, selected_area_number = select_reservoir_area()
 
-# Select area type
-if "area_type" not in st.session_state:
-    st.session_state["area_type"] = "EL"
-
-selected_area = st.radio(
-    "Select area type:",
-    options=["EL", "NO", "VASS"],
-    horizontal=True,
-    key="area_type",
-)
-
-area_numbers = sorted(area_names[selected_area])
-
-# Reset area number when switching area type
-if st.session_state.get("area_number") not in area_numbers:
-    st.session_state["area_number"] = area_numbers[0]
-
-selected_area_number = st.selectbox(
-    "Select area number:",
-    options=area_numbers,
-    format_func=lambda number: (
-        f"{number} - {area_names[selected_area][number]}"
-    ),
-    key="area_number",
-)
-
-st.session_state["selected_reservoir_area"] = (
-    selected_area,
-    int(selected_area_number),
-)
-
+# Get area name
 area_name = (
     "Whole Norway"
     if selected_area == "NO"
