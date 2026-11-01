@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from scipy.signal import stft
 from scipy.fft import dct, idct
 from statsmodels.tsa.seasonal import STL
@@ -12,14 +12,14 @@ def plot_stl(
     seasonal: int = 13,
     trend: int = 105,
     robust: bool = True
-) -> Figure:
+) -> go.Figure:
     """
     Perform STL decomposition on weekly reservoir filling levels.
 
     Parameters
     ----------
     data : pd.DataFrame
-        DataFrame containing weekly filling levels.
+        DataFrame containing Date and Filling level columns.
     seasonal : int, default=13
         Length of the seasonal LOESS smoother.
     trend : int, default=105
@@ -29,8 +29,8 @@ def plot_stl(
 
     Returns
     -------
-    Figure
-        Matplotlib figure showing the STL decomposition.
+    go.Figure
+        Plotly figure showing the STL decomposition.
     """
     # Sort data chronologically
     data = data.sort_values("Date").reset_index(drop=True)
@@ -44,16 +44,57 @@ def plot_stl(
     )
 
     result = stl.fit()
-    fig = result.plot()
+
+    # Create four subplots
+    fig = make_subplots(
+        rows=4,
+        cols=1,
+        shared_xaxes=True,
+        subplot_titles=[
+            "Observed",
+            "Trend",
+            "Seasonal",
+            "Residual"
+        ],
+        vertical_spacing=0.07
+    )
+
+    components = [
+        data["Filling level"],
+        result.trend,
+        result.seasonal,
+        result.resid
+    ]
+
+    for i, component in enumerate(components, start=1):
+        fig.add_trace(
+            go.Scatter(
+                x=data["Date"],
+                y=component,
+                mode="lines",
+                line=dict(color="steelblue", width=1),
+                name=["Observed", "Trend", "Seasonal", "Residual"][i - 1]
+            ),
+            row=i,
+            col=1
+        )
+
+    fig.update_layout(
+        title="STL Decomposition of Reservoir Filling Levels",
+        height=850,
+        showlegend=False,
+        template="plotly_white"
+    )
+
+    fig.update_xaxes(title_text="Date", row=4, col=1)
 
     return fig
-
 
 def plot_spectrogram(
     data: pd.DataFrame,
     nperseg: int = 104,
     noverlap: int = 52
-) -> Figure:
+) -> go.Figure:
     """
     Create a spectrogram of weekly reservoir filling levels.
 
@@ -68,9 +109,12 @@ def plot_spectrogram(
 
     Returns
     -------
-    Figure
-        Matplotlib figure showing the spectrogram.
+    go.Figure
+        Plotly figure showing the spectrogram.
     """
+    # Sort data chronologically
+    data = data.sort_values("Date").reset_index(drop=True)
+
     # Extract filling levels
     y = data["Filling level"].to_numpy()
 
@@ -83,20 +127,23 @@ def plot_spectrogram(
     )
 
     # Create spectrogram
-    fig, ax = plt.subplots(figsize=(12, 5))
-
-    mesh = ax.pcolormesh(
-        t,
-        f,
-        np.abs(Zxx),
-        shading="auto"
+    fig = go.Figure(
+        data=go.Heatmap(
+            x=t,
+            y=f,
+            z=np.abs(Zxx),
+            colorscale="Viridis",
+            colorbar=dict(title="Magnitude")
+        )
     )
 
-    ax.set_title("Spectrogram of reservoir filling levels")
-    ax.set_xlabel("Time (weeks)")
-    ax.set_ylabel("Frequency (cycles/week)")
-
-    fig.colorbar(mesh, ax=ax, label="Magnitude")
+    fig.update_layout(
+        title="Spectrogram of Reservoir Filling Levels",
+        xaxis_title="Time (weeks)",
+        yaxis_title="Frequency (cycles/week)",
+        template="plotly_white",
+        height=500
+    )
 
     return fig
 
@@ -106,7 +153,7 @@ def plot_precipitation_spc(
     cutoff_frequency: float = 1 / 168,
     n_std: float = 3.0,
     area_name: str = "Selected area"
-) -> tuple[Figure, pd.DataFrame]:
+) -> tuple[go.Figure, pd.DataFrame]:
     """
     Plot hourly precipitation with robust SPC control limits.
 
@@ -115,21 +162,23 @@ def plot_precipitation_spc(
     df : pd.DataFrame
         DataFrame containing date and precipitation columns.
     cutoff_frequency : float, default=1/168
-        DCT cutoff frequency in cycles per hour,
-        corresponding to a period of 7 days.
+        DCT cutoff frequency in cycles per hour.
     n_std : float, default=3.0
         Number of robust standard deviations for SPC limits.
+    area_name : str, default="Selected area"
+        Name of the selected area.
 
     Returns
     -------
-    tuple[Figure, pd.DataFrame]
-        Matplotlib figure and a summary of detected outliers.
+    tuple[go.Figure, pd.DataFrame]
+        Plotly figure and a summary of detected outliers.
     """
     # Extract precipitation and dates
     precipitation = df["precipitation"].to_numpy()
-    dates = df["date"]
-    start_year = pd.to_datetime(dates).min().year
-    end_year = pd.to_datetime(dates).max().year
+    dates = pd.to_datetime(df["date"])
+
+    start_year = dates.min().year
+    end_year = dates.max().year
 
     period = (
         str(start_year)
@@ -155,52 +204,65 @@ def plot_precipitation_spc(
     ucl = median + n_std * robust_std
     lcl = median - n_std * robust_std
 
-    # Identify outliers in the filtered signal
+    # Identify outliers
     outliers = (filtered > ucl) | (filtered < lcl)
 
-    # Convert SPC limits to the original precipitation scale
+    # Convert SPC limits to original precipitation scale
     trend = precipitation - filtered
     upper_boundary = trend + ucl
     lower_boundary = trend + lcl
 
-    # Plot precipitation and control limits
-    fig, ax = plt.subplots(figsize=(12, 5))
+    # Create Plotly figure
+    fig = go.Figure()
 
-    ax.plot(
-        dates, precipitation,
-        color="steelblue",
-        linewidth=0.8,
-        label="Average precipitation"
+    fig.add_trace(
+        go.Scatter(
+            x=dates,
+            y=precipitation,
+            mode="lines",
+            name="Average precipitation",
+            line=dict(color="steelblue", width=1)
+        )
     )
 
-    ax.plot(
-        dates, upper_boundary,
-        "r--",
-        label="Upper control limit"
+    fig.add_trace(
+        go.Scatter(
+            x=dates,
+            y=upper_boundary,
+            mode="lines",
+            name="Upper control limit",
+            line=dict(color="red", dash="dash")
+        )
     )
 
-    ax.plot(
-        dates, lower_boundary,
-        "r--",
-        label="Lower control limit"
+    fig.add_trace(
+        go.Scatter(
+            x=dates,
+            y=lower_boundary,
+            mode="lines",
+            name="Lower control limit",
+            line=dict(color="red", dash="dash")
+        )
     )
 
-    ax.scatter(
-        dates[outliers],
-        precipitation[outliers],
-        color="darkorange",
-        s=15,
-        label="Outliers",
-        zorder=3
+    fig.add_trace(
+        go.Scatter(
+            x=dates[outliers],
+            y=precipitation[outliers],
+            mode="markers",
+            name="Outliers",
+            marker=dict(color="darkorange", size=6)
+        )
     )
 
-    ax.set_title(f"Average Precipitation with SPC Limits ({area_name}, {period})")    
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Average precipitation (mm)")
-    ax.legend()
-    ax.grid(alpha=0.3)
-
-    fig.tight_layout()
+    fig.update_layout(
+        title=f"Average Precipitation with SPC Limits ({area_name}, {period})",
+        xaxis_title="Date",
+        yaxis_title="Average precipitation (mm)",
+        template="plotly_white",
+        height=500,
+        hovermode="x unified"
+    )
 
     # Create outlier summary table
     outlier_summary = pd.DataFrame({
@@ -227,7 +289,7 @@ def plot_temperature_lof(
     contamination: float = 0.01,
     n_neighbors: int = 20,
     area_name: str = "Selected area"
-) -> tuple[Figure, pd.DataFrame]:
+) -> tuple[go.Figure, pd.DataFrame]:
     """
     Detect temperature outliers using Local Outlier Factor (LOF).
 
@@ -235,17 +297,18 @@ def plot_temperature_lof(
     ----------
     df : pd.DataFrame
         DataFrame containing date and temperature_2m columns.
-    contamination : float
-        Expected proportion of outliers (default: 0.01).
-    n_neighbors : int
-        Number of nearest neighbors used by LOF (default: 20).
+    contamination : float, default=0.01
+        Expected proportion of outliers.
+    n_neighbors : int, default=20
+        Number of nearest neighbors used by LOF.
+    area_name : str, default="Selected area"
+        Name of the selected area.
 
     Returns
     -------
-    tuple[Figure, pd.DataFrame]
-        Matplotlib figure and a summary table of detected outliers.
+    tuple[go.Figure, pd.DataFrame]
+        Plotly figure and a summary table of detected outliers.
     """
-
     # Extract temperature as a 2D array
     temp = df[["temperature_2m"]].to_numpy()
 
@@ -260,8 +323,10 @@ def plot_temperature_lof(
     # Identify outliers
     outliers = pred_labels == -1
 
-    start_year = pd.to_datetime(df["date"]).min().year
-    end_year = pd.to_datetime(df["date"]).max().year
+    dates = pd.to_datetime(df["date"])
+
+    start_year = dates.min().year
+    end_year = dates.max().year
 
     period = (
         str(start_year)
@@ -269,33 +334,37 @@ def plot_temperature_lof(
         else f"{start_year}–{end_year}"
     )
 
-    # Plot temperature and highlight outliers
-    fig, ax = plt.subplots(figsize=(12, 5))
+    # Create Plotly figure
+    fig = go.Figure()
 
-    ax.plot(
-        df["date"],
-        df["temperature_2m"],
-        color="steelblue",
-        linewidth=0.8,
-        label="Average temperature"
+    fig.add_trace(
+        go.Scatter(
+            x=dates,
+            y=df["temperature_2m"],
+            mode="lines",
+            name="Average temperature",
+            line=dict(color="steelblue", width=1)
+        )
     )
 
-    ax.scatter(
-        df.loc[outliers, "date"],
-        df.loc[outliers, "temperature_2m"],
-        color="darkorange",
-        s=20,
-        label="Outliers",
-        zorder=3
+    fig.add_trace(
+        go.Scatter(
+            x=dates[outliers],
+            y=df.loc[outliers, "temperature_2m"],
+            mode="markers",
+            name="Outliers",
+            marker=dict(color="darkorange", size=7)
+        )
     )
 
-    ax.set_title(f"Average Temperature with LOF Outliers ({area_name}, {period})")    
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Temperature (°C)")
-    ax.legend()
-    ax.grid(alpha=0.3)
-
-    fig.tight_layout()
+    fig.update_layout(
+        title=f"Average Temperature with LOF Outliers ({area_name}, {period})",
+        xaxis_title="Date",
+        yaxis_title="Temperature (°C)",
+        template="plotly_white",
+        height=500,
+        hovermode="x unified"
+    )
 
     # Create outlier summary table
     outlier_summary = pd.DataFrame({

@@ -12,16 +12,16 @@ from pathlib import Path
 def load_coordinates(filename: str) -> dict:
     """Load sampled coordinates from a JSON file."""
 
-    file_path = Path(__file__).resolve().parent.parent / "data" / filename
+    file_path = Path(__file__).resolve().parent.parent / "data" / filename # ?
 
     with open(file_path, "r", encoding="utf-8") as f:
         coordinates = json.load(f)
 
-    # Correct incorrectly encoded region names
+    # correct incorrectly encoded region names
     coordinates = {
         key.replace("RÃ˜", "RØ").replace("RÃ\x98", "RØ"): value
         for key, value in coordinates.items()
-    }
+    } 
 
     return coordinates
 
@@ -42,7 +42,7 @@ def get_area_coordinates(
             point
             for region in el_coordinates.values()
             for point in region
-        ]
+        ] # ? 
 
     elif area_type == "VASS":
         vass_regions = {
@@ -115,7 +115,7 @@ def get_weather_data(
             "models": "era5",
         }
 
-        # Handle temporary API limits
+        # Handle temporary API limits ??
         for attempt in range(5):
             try:
                 responses = openmeteo.weather_api(url, params=params)
@@ -144,28 +144,17 @@ def get_weather_data(
             hourly = response.Hourly()
 
             dates = pd.date_range(
-                start=pd.to_datetime(
-                    hourly.Time(), unit="s", utc=True
-                ),
-                end=pd.to_datetime(
-                    hourly.TimeEnd(), unit="s", utc=True
-                ),
-                freq=pd.Timedelta(
-                    seconds=hourly.Interval()
-                ),
+                start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
+                end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
+                freq=pd.Timedelta(seconds=hourly.Interval()),
                 inclusive="left"
             )
 
             df = pd.DataFrame({
                 "date": dates,
-                "temperature_2m": (
-                    hourly.Variables(0).ValuesAsNumpy()
-                ),
-                "precipitation": (
-                    hourly.Variables(1).ValuesAsNumpy()
-                )
+                "temperature_2m": (hourly.Variables(0).ValuesAsNumpy()),
+                "precipitation": (hourly.Variables(1).ValuesAsNumpy())
             })
-
             dataframes.append(df)
 
     # Combine downloaded data

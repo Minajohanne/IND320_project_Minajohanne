@@ -2,7 +2,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
-
 from utils.weather import (
     load_coordinates,
     get_area_coordinates,
@@ -214,8 +213,7 @@ with tab1:
             area_name=area_name,
         )
 
-        st.pyplot(fig)
-        plt.close(fig)
+        st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("SPC Statistics")
         st.dataframe(summary, hide_index=True)
@@ -264,8 +262,7 @@ with tab2:
             area_name=area_name,
         )
 
-        st.pyplot(fig)
-        plt.close(fig)
+        st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("LOF Statistics")
         st.dataframe(summary, hide_index=True)

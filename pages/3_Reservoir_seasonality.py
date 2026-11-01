@@ -31,10 +31,10 @@ area_names = {
     "NO": {
         0: "Whole Norway",
     },
-    "VASS": {
-        1: "Eastern Norway, Agder and parts of Rogaland",
+      "VASS": {
+        1: "Eastern Norway",
         2: "Western Norway",
-        3: "Central Norway and southern Nordland",
+        3: "Northern Norway",
     },
 }
 
@@ -156,8 +156,7 @@ with tab1:
         robust=robust
     )
 
-    st.pyplot(fig)
-    plt.close(fig)
+    st.plotly_chart(fig, use_container_width=True)  
 
 
 # TAB 2: Spectrogram
@@ -190,5 +189,5 @@ with tab2:
         noverlap=noverlap
     )
 
-    st.pyplot(fig)
-    plt.close(fig)
+    st.plotly_chart(fig, use_container_width=True)
+  
