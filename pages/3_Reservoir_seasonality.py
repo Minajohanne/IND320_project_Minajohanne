@@ -35,9 +35,6 @@ if filtered_dat.empty:
 
 filtered_dat = filtered_dat.sort_values("Date")
 
-
-filtered_dat = filtered_dat.sort_values("Date")
-
 # Select date range
 min_date = filtered_dat["Date"].min().date()
 max_date = filtered_dat["Date"].max().date()

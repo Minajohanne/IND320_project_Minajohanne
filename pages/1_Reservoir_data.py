@@ -1,6 +1,10 @@
+
 import pandas as pd
 import streamlit as st
+
 from utils.reservoir import load_reservoir_data
+from utils.area_selector import select_reservoir_area
+
 
 st.title("Reservoir data table")
 
@@ -8,18 +12,17 @@ url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentli
 
 dat = load_reservoir_data(url).copy()
 
-# Select area type
-selected_area = st.radio(
-    "Select area type:",
-    options=["EL", "NO", "VASS"],
-    horizontal=True
-)
+# Select area type and number
+selected_area, selected_area_number = select_reservoir_area()
 
-# Filter by area type
-area_dat = dat[dat["Area type"] == selected_area].copy()
+# Filter by selected area type and number
+area_dat = dat[
+    (dat["Area type"] == selected_area)
+    & (dat["Area number"] == selected_area_number)
+].copy()
 
 if area_dat.empty:
-    st.warning("No data available for the selected area type.")
+    st.warning("No data available for the selected area.")
     st.stop()
 
 # Find the first month in the dataset
@@ -86,7 +89,7 @@ for col in plot_columns:
         column_config[col] = st.column_config.LineChartColumn(
             col
         )
-        
+
 # Display table
 st.dataframe(
     tbl,
