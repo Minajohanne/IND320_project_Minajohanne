@@ -7,6 +7,7 @@ from openmeteo_requests.Client import OpenMeteoRequestsError
 from retry_requests import retry
 import json 
 from pathlib import Path
+import requests
 
 
 def load_coordinates(filename: str) -> dict:
