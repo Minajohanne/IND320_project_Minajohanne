@@ -58,7 +58,6 @@ if start_date > end_date:
     st.error("Start date must be before end date.")
     st.stop()
 
-# Cache downloads for the selected area and dates
 @st.cache_data(show_spinner="Downloading weather data...")
 def load_weather(
     area_type: str,
@@ -67,6 +66,7 @@ def load_weather(
     end: str,
 ) -> pd.DataFrame:
 
+    # Get coordinates for selected area
     coords = get_area_coordinates(
         area_type=area_type,
         area_number=area_number,
@@ -74,12 +74,15 @@ def load_weather(
         nve_coordinates=load_coordinates("nve_coordinates.json"),
     )
 
-    return get_weather_data(
-        coordinates=coords,
+    # Download weather data from Open-Meteo
+    weather_df = get_weather_data(
+        region="selected_area",
         start_date=start,
         end_date=end,
+        region_coordinates={"selected_area": coords},
     )
 
+    return weather_df
 
 # Download only when requested
 if st.button("Download weather data"):

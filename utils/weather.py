@@ -174,99 +174,107 @@ def get_area_coordinates(
 #     return regional_average
 
 def get_weather_data(
-    coordinates: list[tuple[float, float]],
+    region: str,
     start_date: str,
     end_date: str,
-    batch_size: int = 10
+    region_coordinates: dict[str, list[tuple[float, float]]]
 ) -> pd.DataFrame:
     """
-    Download hourly ERA5 temperature and precipitation from Open-Meteo.
+    Download hourly historical weather data from the Open-Meteo API using the ERA5 model.
+
+    Retrieves temperature and precipitation data for 1000 randomly sampled
+    locations within the specified region and calculates the hourly average
+    across all locations.
 
     Args:
-        coordinates: List of (longitude, latitude) pairs.
-        start_date: Start date in YYYY-MM-DD format.
-        end_date: End date in YYYY-MM-DD format.
-        batch_size: Number of locations per API request.
+        region (str): Region identifier, e.g. "NO 3".
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+        region_coordinates (dict[str, list[tuple[float, float]]]): 
+        Dictionary containing longitude-latitude pairs for each region.
 
     Returns:
-        DataFrame with hourly average temperature and precipitation.
+        pd.DataFrame: DataFrame containing hourly timestamps, average temperature
+        (°C), and average precipitation (mm) for the selected region.
     """
-    if not coordinates:
-        raise ValueError("No coordinates provided.")
-
-    # Set up API client with caching and retries
-    cache_session = requests_cache.CachedSession(
-        ".cache",
-        expire_after=-1
-    )
-    retry_session = retry(
-        cache_session,
-        retries=5,
-        backoff_factor=0.2
-    )
+    # Setup Open-Meteo API client
+    cache_session = requests_cache.CachedSession(".cache", expire_after=-1)
+    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
     openmeteo = openmeteo_requests.Client(session=retry_session)
 
+    # Get coordinates for the selected region
+    coordinates = region_coordinates[region]
+
+    lon = [lon for lon, lat in coordinates]
+    lat = [lat for lon, lat in coordinates]
+
+    # API URL
     url = "https://archive-api.open-meteo.com/v1/archive"
 
+    # Store data for each location
     dataframes = []
-    start_time = time.perf_counter()
-    total_batches = (len(coordinates) + batch_size - 1) // batch_size
+    batch_size = 10
 
-    print(
-        f"Starting download: {len(coordinates)} coordinates, "
-        f"{total_batches} batches",
-        flush=True
-    )
+    # Download weather data in batches
+    for i in range(0, len(lat), batch_size):
 
-    # Download data in smaller batches
-    for i in range(0, len(coordinates), batch_size):
-        batch = coordinates[i:i + batch_size]
-        batch_number = i // batch_size + 1
-        batch_start = time.perf_counter()
+        lat_batch = lat[i:i + batch_size]
+        lon_batch = lon[i:i + batch_size]
 
+        # API parameters
         params = {
-            "latitude": [lat for lon, lat in batch],
-            "longitude": [lon for lon, lat in batch],
+            "latitude": lat_batch,
+            "longitude": lon_batch,
             "start_date": start_date,
             "end_date": end_date,
             "hourly": ["temperature_2m", "precipitation"],
             "models": "era5",
         }
 
-        print(
-            f"Requesting batch {batch_number}/{total_batches}",
-            flush=True
-        )
+        max_retries = 5
 
-        # Handle temporary API limits
-        for attempt in range(5):
+        for attempt in range(max_retries):
             try:
                 responses = openmeteo.weather_api(url, params=params)
                 break
 
             except OpenMeteoRequestsError as e:
-                message = str(e)
-                print(f"API error: {message}", flush=True)
+                error_message = str(e)
 
-                if "Minutely API request limit exceeded" in message:
-                    if attempt == 4:
-                        raise RuntimeError(
-                            "Minute API limit still exceeded after retries."
-                        ) from e
+                if "Minutely API request limit exceeded" in error_message:
+                    print(
+                        f"API limit reached. Waiting 60 seconds... "
+                        f"({attempt + 1}/{max_retries})"
+                    )
 
-                    time.sleep(60)
+                    if attempt < max_retries - 1:
+                        time.sleep(60)
 
-                elif "Hourly API request limit exceeded" in message:
+                elif "Daily API request limit exceeded" in error_message:
                     raise RuntimeError(
-                        "Hourly API limit reached. Try again later."
+                        "Daily API limit reached. Try again tomorrow."
+                    ) from e
+
+                elif "503" in error_message or "service is overloaded" in error_message.lower():
+                    raise RuntimeError(
+                        "Open-Meteo is currently overloaded. "
+                        "Please try downloading the data later."
                     ) from e
 
                 else:
                     raise
 
-        # Process each location's hourly data
+        else:
+            raise RuntimeError(
+                f"Failed to download batch after {max_retries} attempts."
+            )
+
+        # Process data for each location
         for response in responses:
             hourly = response.Hourly()
+
+            temperature = hourly.Variables(0).ValuesAsNumpy()
+            precipitation = hourly.Variables(1).ValuesAsNumpy()
 
             dates = pd.date_range(
                 start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
@@ -277,36 +285,23 @@ def get_weather_data(
 
             df = pd.DataFrame({
                 "date": dates,
-                "temperature_2m": hourly.Variables(0).ValuesAsNumpy(),
-                "precipitation": hourly.Variables(1).ValuesAsNumpy()
+                "temperature_2m": temperature,
+                "precipitation": precipitation
             })
 
             dataframes.append(df)
 
-        print(
-            f"Completed batch {batch_number}/{total_batches} "
-            f"in {time.perf_counter() - batch_start:.1f} seconds",
-            flush=True
-        )
+        print(f"Downloaded {min(i + batch_size, len(lat))}/{len(lat)} locations")
 
-    # Combine downloaded data
-    weather_data = pd.concat(
-        dataframes,
-        ignore_index=True
-    )
+    # Combine all locations
+    weather_data = pd.concat(dataframes, ignore_index=True)
 
-    # Calculate hourly average across all locations
+    # Calculate hourly averages across the region
     regional_average = (
         weather_data
         .groupby("date")[["temperature_2m", "precipitation"]]
         .mean()
         .reset_index()
-    )
-
-    print(
-        f"Download completed in "
-        f"{time.perf_counter() - start_time:.1f} seconds",
-        flush=True
     )
 
     return regional_average
