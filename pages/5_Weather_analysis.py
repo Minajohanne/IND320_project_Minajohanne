@@ -64,17 +64,19 @@ def load_weather(
     area_number: int,
     start: str,
     end: str,
+    el_coordinates: dict,
+    nve_coordinates: dict,
 ) -> pd.DataFrame:
 
     # Get coordinates for selected area
     coords = get_area_coordinates(
         area_type=area_type,
         area_number=area_number,
-        el_coordinates=load_coordinates("el_coordinates.json"),
-        nve_coordinates=load_coordinates("nve_coordinates.json"),
+        el_coordinates=el_coordinates,
+        nve_coordinates=nve_coordinates,
     )
 
-    # Download weather data from Open-Meteo
+    # Download weather data
     weather_df = get_weather_data(
         region="selected_area",
         start_date=start,
@@ -88,12 +90,13 @@ def load_weather(
 if st.button("Download weather data"):
     try:
         weather_data = load_weather(
-            selected_area,
-            selected_area_number,
-            str(start_date),
-            str(end_date),
-        )
-
+        selected_area,
+        selected_area_number,
+        str(start_date),
+        str(end_date),
+        el_coordinates,
+        nve_coordinates,
+    )
         st.session_state["weather_data"] = weather_data
         st.session_state["weather_selection"] = (
             selected_area,
