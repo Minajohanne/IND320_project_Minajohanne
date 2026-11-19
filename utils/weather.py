@@ -67,7 +67,7 @@ def get_area_coordinates(
         )
 
 
-st.cache_data
+@st.cache_data
 def get_weather_data(
     region: str,
     start_date: str,
@@ -133,24 +133,45 @@ def get_weather_data(
                 responses = openmeteo.weather_api(url, params=params)
                 break
 
+
             except OpenMeteoRequestsError as e:
                 error_message = str(e)
+                error_lower = error_message.lower()
 
-                if "Minutely API request limit exceeded" in error_message:
+                if (
+                    "minutely api request limit exceeded" in error_lower
+                    or "minute" in error_lower and "limit" in error_lower
+                ):
                     print(
-                        f"API limit reached. Waiting 60 seconds... "
+                        f"Minutely API limit reached. Waiting 60 seconds... "
                         f"({attempt + 1}/{max_retries})"
                     )
 
                     if attempt < max_retries - 1:
                         time.sleep(60)
 
-                elif "Daily API request limit exceeded" in error_message:
+                elif (
+                    "hourly api request limit exceeded" in error_lower
+                    or "hourly" in error_lower and "limit" in error_lower
+                ):
                     raise RuntimeError(
-                        "Daily API limit reached. Try again tomorrow."
+                        "Open-Meteo hourly API limit reached. "
+                        "Please try downloading the data again in approximately one hour."
                     ) from e
 
-                elif "503" in error_message or "service is overloaded" in error_message.lower():
+                elif (
+                    "daily api request limit exceeded" in error_lower
+                    or "daily" in error_lower and "limit" in error_lower
+                ):
+                    raise RuntimeError(
+                        "Open-Meteo daily API limit reached. "
+                        "Please try again later."
+                    ) from e
+
+                elif (
+                    "503" in error_lower
+                    or "service is overloaded" in error_lower
+                ):
                     raise RuntimeError(
                         "Open-Meteo is currently overloaded. "
                         "Please try downloading the data later."

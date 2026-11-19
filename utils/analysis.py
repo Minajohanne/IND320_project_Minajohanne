@@ -148,33 +148,54 @@ def plot_spectrogram(
     return fig
 
 
+
 def plot_precipitation_spc(
     df: pd.DataFrame,
     cutoff_frequency: float = 1 / 168,
     n_std: float = 3.0,
-    area_name: str = "Selected area"
+    area_name: str = "Selected area",
+    weather_column: str = "temperature_2m"
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
-    Plot hourly precipitation with robust SPC control limits.
+    Plot hourly weather observations with robust SPC control limits.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame containing date and precipitation columns.
+        DataFrame containing date and the selected weather property.
     cutoff_frequency : float, default=1/168
         DCT cutoff frequency in cycles per hour.
     n_std : float, default=3.0
         Number of robust standard deviations for SPC limits.
     area_name : str, default="Selected area"
         Name of the selected area.
+    weather_column : str, default="temperature_2m"
+        Weather property to analyze.
 
     Returns
     -------
     tuple[go.Figure, pd.DataFrame]
         Plotly figure and a summary of detected outliers.
     """
-    # Extract precipitation and dates
-    precipitation = df["precipitation"].to_numpy()
+
+    # Define labels for weather properties
+    weather_labels = {
+        "temperature_2m": ("Temperature", "°C"),
+        "precipitation": ("Precipitation", "mm")
+    }
+
+    if weather_column not in weather_labels:
+        raise ValueError("Invalid weather property.")
+
+    property_name, unit = weather_labels[weather_column]
+
+    # Remove missing observations
+    df = df.dropna(
+        subset=["date", weather_column]
+    ).copy().reset_index(drop=True)
+
+    # Extract weather observations and dates
+    values = df[weather_column].to_numpy()
     dates = pd.to_datetime(df["date"])
 
     start_year = dates.min().year
@@ -187,10 +208,10 @@ def plot_precipitation_spc(
     )
 
     # Apply DCT high-pass filtering
-    N = len(precipitation)
+    N = len(values)
     W = np.arange(N) / (2 * (N - 1))
 
-    dct_signal = dct(precipitation, type=1, norm="forward")
+    dct_signal = dct(values, type=1, norm="forward")
     filtered_dct = dct_signal.copy()
     filtered_dct[W < cutoff_frequency] = 0
 
@@ -207,8 +228,8 @@ def plot_precipitation_spc(
     # Identify outliers
     outliers = (filtered > ucl) | (filtered < lcl)
 
-    # Convert SPC limits to original precipitation scale
-    trend = precipitation - filtered
+    # Convert SPC limits to original weather scale
+    trend = values - filtered
     upper_boundary = trend + ucl
     lower_boundary = trend + lcl
 
@@ -218,9 +239,9 @@ def plot_precipitation_spc(
     fig.add_trace(
         go.Scatter(
             x=dates,
-            y=precipitation,
+            y=values,
             mode="lines",
-            name="Average precipitation",
+            name=f"Average {property_name.lower()}",
             line=dict(color="steelblue", width=1)
         )
     )
@@ -248,7 +269,7 @@ def plot_precipitation_spc(
     fig.add_trace(
         go.Scatter(
             x=dates[outliers],
-            y=precipitation[outliers],
+            y=values[outliers],
             mode="markers",
             name="Outliers",
             marker=dict(color="darkorange", size=6)
@@ -256,9 +277,12 @@ def plot_precipitation_spc(
     )
 
     fig.update_layout(
-        title=f"Average Precipitation with SPC Limits ({area_name}, {period})",
+        title=(
+            f"Average {property_name} with SPC Limits "
+            f"({area_name}, {period})"
+        ),
         xaxis_title="Date",
-        yaxis_title="Average precipitation (mm)",
+        yaxis_title=f"Average {property_name.lower()} ({unit})",
         template="plotly_white",
         height=500,
         hovermode="x unified"
@@ -270,13 +294,13 @@ def plot_precipitation_spc(
             "Total observations",
             "Number of outliers",
             "Percentage of outliers (%)",
-            "Maximum outlier precipitation (mm)"
+            f"Maximum outlier {property_name.lower()} ({unit})"
         ],
         "Value": [
-            len(precipitation),
+            len(values),
             int(outliers.sum()),
             round(outliers.mean() * 100, 2),
-            round(float(precipitation[outliers].max()), 3)
+            round(float(values[outliers].max()), 3)
             if outliers.any() else np.nan
         ]
     })
@@ -284,33 +308,55 @@ def plot_precipitation_spc(
     return fig, outlier_summary
 
 
+
+
 def plot_temperature_lof(
     df: pd.DataFrame,
     contamination: float = 0.01,
     n_neighbors: int = 20,
-    area_name: str = "Selected area"
+    area_name: str = "Selected area",
+    weather_column: str = "temperature_2m"
 ) -> tuple[go.Figure, pd.DataFrame]:
     """
-    Detect temperature outliers using Local Outlier Factor (LOF).
+    Detect weather outliers using Local Outlier Factor (LOF).
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame containing date and temperature_2m columns.
+        DataFrame containing date and the selected weather property.
     contamination : float, default=0.01
         Expected proportion of outliers.
     n_neighbors : int, default=20
         Number of nearest neighbors used by LOF.
     area_name : str, default="Selected area"
         Name of the selected area.
+    weather_column : str, default="temperature_2m"
+        Weather property to analyze.
 
     Returns
     -------
     tuple[go.Figure, pd.DataFrame]
         Plotly figure and a summary table of detected outliers.
     """
-    # Extract temperature as a 2D array
-    temp = df[["temperature_2m"]].to_numpy()
+
+    # Define labels for the selected weather property
+    weather_labels = {
+        "temperature_2m": ("Temperature", "°C"),
+        "precipitation": ("Precipitation", "mm")
+    }
+
+    if weather_column not in weather_labels:
+        raise ValueError("Invalid weather property.")
+
+    property_name, unit = weather_labels[weather_column]
+
+    # Remove missing values and reset index
+    df = df.dropna(
+        subset=["date", weather_column]
+    ).copy().reset_index(drop=True)
+
+    # Extract selected weather property as a 2D array
+    values = df[[weather_column]].to_numpy()
 
     # Apply Local Outlier Factor
     lof = LocalOutlierFactor(
@@ -318,7 +364,7 @@ def plot_temperature_lof(
         contamination=contamination
     )
 
-    pred_labels = lof.fit_predict(temp)
+    pred_labels = lof.fit_predict(values)
 
     # Identify outliers
     outliers = pred_labels == -1
@@ -340,9 +386,9 @@ def plot_temperature_lof(
     fig.add_trace(
         go.Scatter(
             x=dates,
-            y=df["temperature_2m"],
+            y=df[weather_column],
             mode="lines",
-            name="Average temperature",
+            name=f"Average {property_name.lower()}",
             line=dict(color="steelblue", width=1)
         )
     )
@@ -350,7 +396,7 @@ def plot_temperature_lof(
     fig.add_trace(
         go.Scatter(
             x=dates[outliers],
-            y=df.loc[outliers, "temperature_2m"],
+            y=df.loc[outliers, weather_column],
             mode="markers",
             name="Outliers",
             marker=dict(color="darkorange", size=7)
@@ -358,9 +404,12 @@ def plot_temperature_lof(
     )
 
     fig.update_layout(
-        title=f"Average Temperature with LOF Outliers ({area_name}, {period})",
+        title=(
+            f"Average {property_name} with LOF Outliers "
+            f"({area_name}, {period})"
+        ),
         xaxis_title="Date",
-        yaxis_title="Temperature (°C)",
+        yaxis_title=f"{property_name} ({unit})",
         template="plotly_white",
         height=500,
         hovermode="x unified"
@@ -372,16 +421,16 @@ def plot_temperature_lof(
             "Total observations",
             "Number of outliers",
             "Percentage of outliers (%)",
-            "Minimum outlier temperature (°C)",
-            "Maximum outlier temperature (°C)"
+            f"Minimum outlier {property_name.lower()} ({unit})",
+            f"Maximum outlier {property_name.lower()} ({unit})"
         ],
         "Value": [
             len(df),
             int(outliers.sum()),
             round(outliers.mean() * 100, 2),
-            round(float(temp[outliers].min()), 2)
+            round(float(values[outliers].min()), 2)
             if outliers.any() else np.nan,
-            round(float(temp[outliers].max()), 2)
+            round(float(values[outliers].max()), 2)
             if outliers.any() else np.nan
         ]
     })

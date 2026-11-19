@@ -135,13 +135,27 @@ tab1, tab2 = st.tabs(["Outlier / SPC", "Anomaly / LOF"])
 
 # TAB 1: SPC
 with tab1:
-    st.subheader("Precipitation Outlier Detection (SPC)")
+
+    st.subheader("Weather Outlier Detection (SPC)")
 
     st.write(
         "Statistical Process Control (SPC) identifies unusual "
-        "precipitation values by comparing high-frequency variations "
+        "weather observations by comparing high-frequency variations "
         "with robust control limits based on the median and MAD."
     )
+
+    # Select weather property
+    weather_property = st.selectbox(
+        "Select weather property",
+        ["Temperature", "Precipitation"],
+        index=0,
+        key="spc_weather_property"
+    )
+
+    weather_column = {
+        "Temperature": "temperature_2m",
+        "Precipitation": "precipitation"
+    }[weather_property]
 
     cutoff_period = st.slider(
         "Cutoff period (hours):",
@@ -160,17 +174,18 @@ with tab1:
     )
 
     spc_data = weather_data.dropna(
-        subset=["date", "precipitation"]
+        subset=["date", weather_column]
     ).copy()
 
     if len(spc_data) < 2:
-        st.warning("Not enough precipitation observations.")
+        st.warning("Not enough weather observations.")
     else:
         fig, summary = plot_precipitation_spc(
             spc_data,
             cutoff_frequency=1 / cutoff_period,
             n_std=n_std,
             area_name=area_name,
+            weather_column=weather_column
         )
 
         st.plotly_chart(fig, use_container_width=True)
@@ -179,16 +194,30 @@ with tab1:
         st.dataframe(summary, hide_index=True)
 
 
+
 # TAB 2: LOF
 with tab2:
-    st.subheader("Temperature Anomaly Detection (LOF)")
+
+    st.subheader("Weather Anomaly Detection (LOF)")
 
     st.write(
-        "Local Outlier Factor (LOF) compares each temperature "
-        "observation with nearby values in feature space. "
-        "Observations with unusually low local density "
-        "are classified as anomalies."
+        "Local Outlier Factor (LOF) compares each weather observation "
+        "with nearby values in feature space. Observations with "
+        "unusually low local density are classified as anomalies."
     )
+
+    # Select weather property
+    weather_property = st.selectbox(
+        "Select weather property",
+        ["Temperature", "Precipitation"],
+        index=0,
+        key="lof_weather_property"
+    )
+
+    weather_column = {
+        "Temperature": "temperature_2m",
+        "Precipitation": "precipitation"
+    }[weather_property]
 
     contamination = st.slider(
         "Expected proportion of anomalies:",
@@ -196,23 +225,27 @@ with tab2:
         max_value=0.10,
         value=0.01,
         step=0.001,
-        format="%.3f",
+        format="%.3f"
     )
 
+    # Remove missing observations
     lof_data = weather_data.dropna(
-        subset=["date", "temperature_2m"]
+        subset=["date", weather_column]
     ).copy()
 
     max_neighbors = min(100, len(lof_data) - 1)
 
     if max_neighbors < 2:
-        st.warning("Not enough temperature observations for LOF.")
+        st.warning(
+            "Not enough weather observations for LOF."
+        )
+
     else:
         n_neighbors = st.slider(
             "Number of neighbors:",
             min_value=2,
             max_value=max_neighbors,
-            value=min(20, max_neighbors),
+            value=min(20, max_neighbors)
         )
 
         fig, summary = plot_temperature_lof(
@@ -220,9 +253,16 @@ with tab2:
             contamination=contamination,
             n_neighbors=n_neighbors,
             area_name=area_name,
+            weather_column=weather_column
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
         st.subheader("LOF Statistics")
-        st.dataframe(summary, hide_index=True)
+        st.dataframe(
+            summary,
+            hide_index=True
+        )
