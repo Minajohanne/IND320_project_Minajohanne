@@ -347,12 +347,13 @@ if len(valid_pairs) < window_length:
 # Calculate sliding window correlation.
 
 # Calculate rolling correlations using the selected lag and window.
-result = sliding_window_correlation(
-    data=df,
-    weather_column=weather_property,
-    window=window_length,
-    lag=lag,
-)
+with st.spinner("Calculating correlations..."):
+    result = sliding_window_correlation(
+        data=df,
+        weather_column=weather_property,
+        window=window_length,
+        lag=lag,
+    )
 
 # Convert DatetimeIndex back to a column for Plotly
 result = result.reset_index()

@@ -34,6 +34,22 @@ from utils.mongoDB import load_electricity_data
 from utils.exchange_rates import get_exchange_rates
 
 
+# Cache weather downloads for repeated forecasts with the same inputs.
+@st.cache_data(show_spinner="Downloading weather data...")
+def load_forecast_weather(
+    region: str,
+    start_date: str,
+    end_date: str,
+    coordinates: list,
+) -> pd.DataFrame:
+    return get_weather_data(
+        region=region,
+        start_date=start_date,
+        end_date=end_date,
+        region_coordinates={region: coordinates},
+    )
+
+
 # Page title.
 
 st.title("Reservoir Filling Forecast")
@@ -139,7 +155,7 @@ with col1:
         "AR order (p)",
         min_value=0,
         max_value=10,
-        value=3,
+        value=1,
     )
 
 with col2:
@@ -147,7 +163,7 @@ with col2:
         "Differencing (d)",
         min_value=0,
         max_value=2,
-        value=1,
+        value=0,
     )
 
 with col3:
@@ -155,7 +171,7 @@ with col3:
         "MA order (q)",
         min_value=0,
         max_value=10,
-        value=1,
+        value=0,
     )
 
 
@@ -169,7 +185,7 @@ with st.expander("Seasonal parameters"):
             "Seasonal AR (sp)",
             min_value=0,
             max_value=3,
-            value=0,
+            value=1,
         )
 
     with col2:
@@ -292,13 +308,11 @@ if st.button("Generate forecast", type="primary"):
                     f"{selected_area_number}"
                 )
 
-                weather_raw = get_weather_data(
+                weather_raw = load_forecast_weather(
                     region=region,
                     start_date=start_date,
                     end_date=end_date,
-                    region_coordinates={
-                        region: coordinates
-                    },
+                    coordinates=coordinates,
                 )
 
                 weather = prepare_weekly_weather(

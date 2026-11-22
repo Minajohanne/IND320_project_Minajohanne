@@ -54,7 +54,7 @@ def get_mongo_client() -> MongoClient:
 
 
 # Retrieve electricity flow observations from MongoDB.
-@st.cache_data
+@st.cache_data(ttl=3600, show_spinner="Loading electricity data...")
 def load_electricity_data() -> list[dict]:
     """Load electricity flow documents from MongoDB Atlas."""
     client = get_mongo_client()

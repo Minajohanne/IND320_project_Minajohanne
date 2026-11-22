@@ -130,7 +130,7 @@ with col2:
     # Select year
     line_year = st.selectbox(
         "Select year:",
-        options=[2024, 2025, 2026],
+        options=available_years,
         key="line_year"
     )
 

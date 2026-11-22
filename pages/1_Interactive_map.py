@@ -245,12 +245,17 @@ else:
         "nve_coordinates.json"
     )
 
-    with st.spinner("Loading weather data..."):
-        weather_data = get_weather_map_data(
-            start_date=start_date.isoformat(),
-            end_date=end_date.isoformat(),
-            nve_coordinates=nve_coordinates,
-        )
+    try:
+        with st.spinner("Loading weather data..."):
+            weather_data = get_weather_map_data(
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+                nve_coordinates=nve_coordinates,
+            )
+    except Exception as error:
+        st.error(f"Unable to download weather data: {error}")
+        st.stop()
+
 
     if weather_data.empty:
         st.warning("No weather data available.")

@@ -1,6 +1,4 @@
-import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
 
 from utils.reservoir import load_reservoir_data
 from utils.analysis import plot_stl, plot_spectrogram
@@ -106,12 +104,13 @@ with tab1:
     )
 
     try:
-        fig = plot_stl(
-            filtered_dat,
-            seasonal=seasonal,
-            trend=trend,
-            robust=robust
-        )
+        with st.spinner("Running STL decomposition..."):
+            fig = plot_stl(
+                filtered_dat,
+                seasonal=seasonal,
+                trend=trend,
+                robust=robust
+            )
     
     except (ValueError, RuntimeError) as error:
         st.warning(f"Analysis unavailable: {error}")
@@ -148,12 +147,13 @@ with tab2:
     )
 
     try:
-        fig = plot_spectrogram(
-            filtered_dat,
-            nperseg=nperseg,
-            noverlap=noverlap
-        )
-    
+        with st.spinner("Calculating spectrogram..."):
+            fig = plot_spectrogram(
+                filtered_dat,
+                nperseg=nperseg,
+                noverlap=noverlap
+            )
+        
     except (ValueError, RuntimeError) as error:
         st.warning(f"Analysis unavailable: {error}")
         st.stop()
