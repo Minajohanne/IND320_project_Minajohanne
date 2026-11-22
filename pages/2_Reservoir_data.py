@@ -103,19 +103,5 @@ st.dataframe(
     width="stretch"
 )
 
-with st.expander('How to interpret the results'):
-    st.markdown('The first table contains the earliest month available for the selected area. The miniature line charts show how each measurement changes over the available weeks. Filling levels are fractions: 0.5 corresponds to 50%.')
-
 with st.expander('About the data'):
     st.markdown('Reservoir statistics are retrieved from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Filling level and previous-week filling level are fractions (0–1), capacity and stored energy are in TWh, and changes in filling level are differences between fractions.')
-
-# Summarize the data used in this view.
-st.subheader("Data summary")
-_summary = first_month
-_summary_dates = pd.to_datetime(_summary['Date'], errors="coerce").dropna()
-_sum_cols = st.columns(3)
-_sum_cols[0].metric("Observations", f"{len(_summary):,}")
-_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
-_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))
-
-st.caption("Mini-chart units: filling level and previous-week filling level (fraction, 0–1); capacity and stored energy (TWh); change in filling level (fraction difference).")

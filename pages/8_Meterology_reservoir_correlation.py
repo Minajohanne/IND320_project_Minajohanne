@@ -519,14 +519,3 @@ else:
 with st.expander('How to interpret the results'):
     st.markdown('The bottom plot shows rolling Pearson correlation from −1 to +1. Positive values indicate variables moving together within a window; negative values indicate opposite movement. The lag compares earlier weather with later filling levels. Correlation does not imply causation, and overlapping windows are not independent.')
 
-with st.expander('About the data'):
-    st.markdown('Reservoir filling data are from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/); historical temperature and precipitation data are from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Filling level is a fraction (0–1), temperature is in °C, and precipitation is aggregated to weekly totals in mm. Weather values are based on up to 100 sampled coordinates.')
-
-# Summarize the data used in this view.
-st.subheader("Data summary")
-_summary = df.reset_index()
-_summary_dates = pd.to_datetime(_summary['date'], errors="coerce").dropna()
-_sum_cols = st.columns(3)
-_sum_cols[0].metric("Observations", f"{len(_summary):,}")
-_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
-_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))

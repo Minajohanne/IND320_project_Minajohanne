@@ -290,19 +290,5 @@ with tab2:
             hide_index=True
         )
 
-with st.expander('How to interpret the results'):
-    st.markdown('**SPC:** Observations beyond robust control limits are flagged as unusual, not necessarily incorrect. **LOF:** Points with lower local density than their neighbours are flagged as anomalies. Results depend on the selected cutoff, threshold, neighbours and contamination.')
-
 with st.expander('About the data'):
     st.markdown('Historical temperature and precipitation data are obtained from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Temperature is in °C and precipitation is in mm. Values are aggregated over sampled coordinates for the selected area; the displayed observations are hourly.')
-
-# Summarize the data used in this view.
-st.subheader("Data summary")
-_summary = weather_data
-_summary_dates = pd.to_datetime(_summary['date'], errors="coerce").dropna()
-_sum_cols = st.columns(3)
-_sum_cols[0].metric("Observations", f"{len(_summary):,}")
-_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
-_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))
-
-st.caption("Temperature: °C; precipitation: mm. SPC frequency uses hours; LOF scores are unitless.")

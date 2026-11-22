@@ -471,7 +471,7 @@ if st.session_state.get("selected_area_type") == area_code:
     if selected_area is not None:
         st.write(f"Selected area: {selected_area}")
 
-with st.expander('How to interpret the results'):
+with st.expander('How to interpret the map'):
     st.markdown('The map shows values for the selected ISO week. Colours indicate relative values across displayed regions; the legend provides the measurement scale. Reservoir filling is a fraction, not a percentage. Weather conditions are regional estimates, and precipitation totals refer to the selected week.')
 
 with st.expander('About the data'):

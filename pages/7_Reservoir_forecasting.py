@@ -423,7 +423,7 @@ if st.button("Generate forecast", type="primary"):
 
 
 with st.expander('How to interpret the results'):
-    st.markdown('The SNARIMAX model forecasts weekly filling levels using historical observations and optionally other data sources. The forecast is model-based and uncertain, especially further into the future. Exogenous inputs and the chosen training period can influence results; predictions are not guarantees.')
+    st.markdown('The SNARIMAX model forecasts weekly reservoir filling levels based on historical observations, with the option to include exogenous variables such as weather conditions, electricity flows, and exchange rates. Forecast accuracy depends on the selected training period, model parameters, and available data. When exogenous variables are included, their last observed values are assumed to remain constant throughout the forecast horizon. Forecasts are subject to uncertainty, particularly over longer horizons, and should be interpreted as model-based estimates rather than exact prediction.')
 
 with st.expander('About the data'):
     st.markdown('Reservoir filling data are from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Optional explanatory variables come from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api), [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/), and [Norges Bank](https://www.norges-bank.no/). Filling level is a fraction (0–1). External series are aligned to weekly data for model input.')

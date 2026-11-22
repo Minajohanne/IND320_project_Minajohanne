@@ -163,17 +163,6 @@ with tab2:
     st.plotly_chart(fig, use_container_width=True)
   
 
-with st.expander('How to interpret the results'):
-    st.markdown('**STL:** The trend shows slow changes, the seasonal component recurring patterns, and the residual remaining variation. **Spectrogram:** Frequency (cycles per week) shows how rapidly patterns repeat; stronger colour indicates a larger spectral magnitude. These methods describe patterns rather than establish causes.')
-
 with st.expander('About the data'):
     st.markdown('Weekly reservoir filling data come from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Filling levels are fractions (0–1); decomposition components use the same scale. Analyses are based on the selected area and date range.')
 
-# Summarize the data used in this view.
-st.subheader("Data summary")
-_summary = filtered_dat
-_summary_dates = pd.to_datetime(_summary['Date'], errors="coerce").dropna()
-_sum_cols = st.columns(3)
-_sum_cols[0].metric("Observations", f"{len(_summary):,}")
-_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
-_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))
