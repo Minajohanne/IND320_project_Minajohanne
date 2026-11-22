@@ -3,8 +3,9 @@ import pandas as pd
 import requests
 
 
+# Download exchange rates for the requested date range.
 def get_exchange_rates(start_date: str, end_date: str) -> pd.DataFrame:
-    """Download historical EUR and USD exchange rates against NOK."""
+    """Download daily EUR/NOK and USD/NOK rates (NOK per foreign currency unit)."""
     start = pd.to_datetime(start_date, errors="coerce")
     end = pd.to_datetime(end_date, errors="coerce")
     if pd.isna(start) or pd.isna(end) or start > end:

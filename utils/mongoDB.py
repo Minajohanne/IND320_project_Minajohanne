@@ -11,6 +11,7 @@ from pymongo.errors import (
 )
 
 
+# Create a MongoDB client using the configured connection.
 @st.cache_resource
 def get_mongo_client() -> MongoClient:
     """Connect to MongoDB Atlas and verify the connection."""
@@ -52,6 +53,7 @@ def get_mongo_client() -> MongoClient:
         ) from exc
 
 
+# Retrieve electricity flow observations from MongoDB.
 @st.cache_data
 def load_electricity_data() -> list[dict]:
     """Load electricity flow documents from MongoDB Atlas."""

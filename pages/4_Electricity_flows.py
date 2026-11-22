@@ -110,6 +110,7 @@ with col1:
         )
 
         fig = apply_plot_theme(fig)
+        fig.update_traces(hovertemplate="%{label}: %{value:,.0f} MW (sum of records)<extra></extra>")
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -257,3 +258,18 @@ with st.expander("About the data"):
         in megawatts (MW).
         """
     )
+
+with st.expander('How to interpret the results'):
+    st.markdown('The pie chart compares the sum of reported flow quantities for import and export. Because MW is power, summing hourly MW readings should not be interpreted as energy without accounting for observation durations. The line chart shows power over time; gaps indicate missing observations.')
+
+with st.expander('About the data'):
+    st.markdown('Cross-border electricity data come from [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) and are retrieved from MongoDB. The underlying quantity is expressed in MW. The pie chart sums recorded MW values by direction; it does not directly represent total energy in MWh.')
+
+# Summarize the data used in this view.
+st.subheader("Data summary")
+_summary = df
+_summary_dates = pd.to_datetime(_summary['timestamp'], errors="coerce").dropna()
+_sum_cols = st.columns(3)
+_sum_cols[0].metric("Observations", f"{len(_summary):,}")
+_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
+_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))

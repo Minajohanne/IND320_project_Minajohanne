@@ -5,6 +5,7 @@ import requests
 import streamlit as st
 
 
+# Fetch reservoir statistics from the NVE API.
 @st.cache_data
 def get_reservoir_data(url: str) -> pd.DataFrame:
     """Fetch reservoir observations from NVE with useful error messages."""
@@ -27,8 +28,9 @@ def get_reservoir_data(url: str) -> pd.DataFrame:
     return df
 
 
+# Rename reservoir data columns for use in the dashboard.
 def map_names(df: pd.DataFrame) -> pd.DataFrame:
-    """Rename NVE's Norwegian column names to English."""
+    """Rename NVE columns; filling levels are fractions (0–1), energy is TWh."""
     column_mapping = {
         "dato_Id": "Date",
         "omrType": "Area type",
@@ -45,6 +47,7 @@ def map_names(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=column_mapping)
 
 
+# Load and prepare reservoir observations.
 @st.cache_data
 def load_reservoir_data(url: str) -> pd.DataFrame:
     """Load, validate, and sort NVE reservoir statistics."""

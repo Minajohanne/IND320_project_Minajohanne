@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from river import time_series, metrics
 
 
+# Fit the forecasting model and predict future reservoir filling.
 def SARIMAX_filling(
     df: pd.DataFrame,
     area_number: int,
@@ -349,6 +350,7 @@ def SARIMAX_filling(
     })
 
 
+# Visualize historical reservoir levels and forecast values.
 def plot_forecast_animation(
     historical_data: pd.DataFrame,
     forecast: pd.DataFrame,
@@ -445,8 +447,8 @@ def plot_forecast_animation(
     fig.update_layout(
         title="Reservoir Filling Forecast",
         xaxis_title="Date",
-        yaxis_title="Filling level",
-        yaxis=dict(range=[0, 1]),
+        yaxis_title="Filling level (fraction)",
+        yaxis=dict(range=[0, 1]),  # Physical range for reservoir filling fractions
         hovermode="x unified",
         updatemenus=[
             dict(

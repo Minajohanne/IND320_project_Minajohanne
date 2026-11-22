@@ -1,6 +1,7 @@
 import pandas as pd
 
 
+# Check that the required input columns are available.
 def _require_columns(df: pd.DataFrame, columns: list[str], source: str) -> None:
     if df is None or df.empty:
         raise ValueError(f"No {source} data available.")
@@ -9,6 +10,7 @@ def _require_columns(df: pd.DataFrame, columns: list[str], source: str) -> None:
         raise ValueError(f"Missing {source} columns: {', '.join(missing)}.")
 
 
+# Prepare external variables for the forecasting model.
 def preprocess_exogenous(
     df: pd.DataFrame,
     date_col: str,
@@ -39,8 +41,9 @@ def preprocess_exogenous(
     return result
 
 
+# Aggregate weather observations to weekly values.
 def prepare_weekly_weather(weather_data: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate hourly weather data to weekly observations."""
+    """Use weekly mean temperature (°C) and sum of hourly precipitation (mm)."""
     return preprocess_exogenous(
         df=weather_data,
         date_col="date",
@@ -49,8 +52,9 @@ def prepare_weekly_weather(weather_data: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+# Aggregate electricity flow data to weekly values.
 def prepare_weekly_entsoe(entsoe_data: pd.DataFrame, area_number: int) -> pd.DataFrame:
-    """Prepare weekly import and export data for one electricity area."""
+    """Aggregate power flows as weekly mean MW, not weekly energy in MWh."""
     _require_columns(
         entsoe_data,
         ["from_zone", "to_zone", "timestamp", "quantity_mw", "direction"],
@@ -85,14 +89,16 @@ def prepare_weekly_entsoe(entsoe_data: pd.DataFrame, area_number: int) -> pd.Dat
     return weekly
 
 
+# Prepare weekly exchange rate observations.
 def prepare_weekly_exchange_rates(exchange_rates: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate daily exchange rates to weekly observations."""
+    """Average daily EUR/NOK and USD/NOK rates into weekly NOK per unit."""
     return preprocess_exogenous(
         df=exchange_rates, date_col="Date",
         aggregation={"EUR": "mean", "USD": "mean"},
     )
 
 
+# Convert reservoir data to the format expected by the forecast model.
 def prepare_reservoir_for_forecast(reservoir_data: pd.DataFrame) -> pd.DataFrame:
     """Restore column names expected by SARIMAX_filling."""
     _require_columns(

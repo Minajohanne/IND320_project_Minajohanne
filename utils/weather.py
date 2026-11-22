@@ -14,6 +14,7 @@ from openmeteo_requests.Client import OpenMeteoRequestsError
 from retry_requests import retry
 
 
+# Load saved coordinates for the weather regions.
 def load_coordinates(filename: str) -> dict:
     """Load and validate sampled longitude/latitude pairs from a JSON file."""
     file_path = Path(__file__).resolve().parent.parent / "data" / filename
@@ -48,6 +49,7 @@ def load_coordinates(filename: str) -> dict:
     return coordinates
 
 
+# Find coordinates belonging to the selected reservoir area.
 def get_area_coordinates(
     area_type: str,
     area_number: int,
@@ -76,6 +78,7 @@ def get_area_coordinates(
     return coordinates
 
 
+# Download and combine weather observations for the selected region.
 @st.cache_data
 def get_weather_data(
     region: str,
@@ -83,7 +86,11 @@ def get_weather_data(
     end_date: str,
     region_coordinates: dict[str, list[tuple[float, float]]],
 ) -> pd.DataFrame:
-    """Download hourly ERA5 data and average observations across selected locations."""
+    """Download hourly ERA5 temperature (°C) and precipitation (mm).
+
+    Each timestamp is averaged across sampled locations. Precipitation
+    therefore represents mean regional hourly precipitation, not its sum.
+    """
     if region not in region_coordinates or not region_coordinates[region]:
         raise ValueError(f"No coordinates available for region '{region}'.")
     try:

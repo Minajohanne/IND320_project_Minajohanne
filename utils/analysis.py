@@ -9,6 +9,7 @@ from sklearn.neighbors import LocalOutlierFactor
 
 
 
+# Check that the time series has the required structure.
 def validate_time_series(data: pd.DataFrame, required_columns: list[str], min_rows: int = 1) -> pd.DataFrame:
     """Validate required fields without dropping or interpolating time points."""
     if not isinstance(data, pd.DataFrame) or data.empty:
@@ -21,6 +22,7 @@ def validate_time_series(data: pd.DataFrame, required_columns: list[str], min_ro
     return data.copy()
 
 
+# Check for missing observations before running the analysis.
 def require_complete_series(data: pd.DataFrame, value_column: str, date_column: str = "Date") -> pd.DataFrame:
     """Require a complete, weekly series for analyses that cannot handle NaN."""
     df = validate_time_series(data, [date_column, value_column])
@@ -35,6 +37,7 @@ def require_complete_series(data: pd.DataFrame, value_column: str, date_column: 
         raise ValueError("The time series has missing or irregular weeks.")
     return df.reset_index(drop=True)
 
+# Separate reservoir filling into trend, seasonal, and residual components.
 def plot_stl(
     data: pd.DataFrame,
     seasonal: int = 13,
@@ -119,10 +122,14 @@ def plot_stl(
         template="plotly_white"
     )
 
+    # NVE filling levels are fractions (0–1), not percentages.
+    for row in range(1, 5):
+        fig.update_yaxes(title_text="Filling level (fraction)", row=row, col=1)
     fig.update_xaxes(title_text="Date", row=4, col=1)
 
     return fig
 
+# Show how the frequency content changes over time.
 def plot_spectrogram(
     data: pd.DataFrame,
     nperseg: int = 104,
@@ -169,13 +176,13 @@ def plot_spectrogram(
             y=f,
             z=np.abs(Zxx),
             colorscale="Viridis",
-            colorbar=dict(title="Magnitude")
+            colorbar=dict(title="STFT magnitude (fraction)")
         )
     )
 
     fig.update_layout(
         title="Spectrogram of Reservoir Filling Levels",
-        xaxis_title="Time (weeks)",
+        xaxis_title="Time since first observation (weeks)",
         yaxis_title="Frequency (cycles/week)",
         template="plotly_white",
         height=500
@@ -185,6 +192,7 @@ def plot_spectrogram(
 
 
 
+# Identify unusual weather observations using robust control limits.
 def plot_precipitation_spc(
     df: pd.DataFrame,
     cutoff_frequency: float = 1 / 168,
@@ -364,6 +372,7 @@ def plot_precipitation_spc(
 
 
 
+# Detect weather anomalies using Local Outlier Factor.
 def plot_temperature_lof(
     df: pd.DataFrame,
     contamination: float = 0.01,
@@ -505,6 +514,7 @@ def plot_temperature_lof(
 
 
 
+# Calculate rolling correlation between weather and reservoir filling.
 def sliding_window_correlation(
     data: pd.DataFrame,
     weather_column: str,

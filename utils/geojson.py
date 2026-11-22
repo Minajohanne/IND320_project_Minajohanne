@@ -2,6 +2,7 @@ import geopandas as gpd
 import streamlit as st
 
 
+# Load geographical boundaries from a GeoJSON file.
 @st.cache_data
 def load_geojson(path: str) -> dict:
     """Read a shapefile and convert it to GeoJSON."""
@@ -25,6 +26,7 @@ def load_geojson(path: str) -> dict:
     return gdf.__geo_interface__
 
 
+# Combine regional boundaries into reservoir area geometries.
 @st.cache_data
 def create_vass_geojson(nve_geojson: dict) -> dict:
     """Merge precipitation regions into VASS areas."""

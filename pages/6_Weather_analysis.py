@@ -26,6 +26,7 @@ st.write(
 
 # Load sampled coordinates
 @st.cache_data
+# Cache coordinates for the electricity and weather regions.
 def load_region_coordinates():
     el = load_coordinates("el_coordinates.json")
     nve = load_coordinates("nve_coordinates.json")
@@ -42,7 +43,7 @@ area_name = (
     else f"{selected_area} {selected_area_number}"
 )
 
-# Select weather data period
+# Choose the period for weather data.
 start_date = st.date_input(
     "Start date:",
     value=pd.Timestamp("2024-01-01").date(),
@@ -60,6 +61,7 @@ if start_date > end_date:
     st.stop()
 
 @st.cache_data(show_spinner="Downloading weather data...")
+# Download weather observations for the selected area.
 def load_weather(
     area_type: str,
     area_number: int,
@@ -87,7 +89,7 @@ def load_weather(
 
     return weather_df
 
-# Download only when requested
+# Only download weather data when the button is clicked.
 if st.button("Download weather data"):
     try:
         weather_data = load_weather(
@@ -109,7 +111,7 @@ if st.button("Download weather data"):
     except Exception as e:
         st.error(f"Could not download weather data: {e}")
 
-# Check that stored weather data matches the current selection
+# Ensure cached session data matches the current settings.
 current_selection = (
     selected_area,
     selected_area_number,
@@ -117,6 +119,9 @@ current_selection = (
     str(end_date),
 )
 
+
+with st.expander('About the data'):
+    st.markdown('Historical temperature and precipitation data are obtained from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Temperature is in °C and precipitation is in mm. Values are aggregated over sampled coordinates for the selected area; the displayed observations are hourly.')
 if (
     "weather_data" not in st.session_state
     or st.session_state.get("weather_selection") != current_selection
@@ -130,7 +135,7 @@ weather_data = weather_data.sort_values("date").reset_index(drop=True)
 
 st.success(f"Loaded {len(weather_data)} hourly observations.")
 
-# Create tabs
+# Separate SPC outlier detection and LOF anomaly detection.
 tab1, tab2 = st.tabs(["Outlier / SPC", "Anomaly / LOF"])
 
 
@@ -158,6 +163,7 @@ with tab1:
         "Precipitation": "precipitation"
     }[weather_property]
 
+    # Choose the cutoff period for the SPC analysis.
     cutoff_period = st.slider(
         "Cutoff period (hours):",
         min_value=24,
@@ -228,6 +234,7 @@ with tab2:
         "Precipitation": "precipitation"
     }[weather_property]
 
+    # Set the expected fraction of anomalies for LOF.
     contamination = st.slider(
         "Expected proportion of anomalies:",
         min_value=0.001,
@@ -282,3 +289,20 @@ with tab2:
             summary,
             hide_index=True
         )
+
+with st.expander('How to interpret the results'):
+    st.markdown('**SPC:** Observations beyond robust control limits are flagged as unusual, not necessarily incorrect. **LOF:** Points with lower local density than their neighbours are flagged as anomalies. Results depend on the selected cutoff, threshold, neighbours and contamination.')
+
+with st.expander('About the data'):
+    st.markdown('Historical temperature and precipitation data are obtained from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Temperature is in °C and precipitation is in mm. Values are aggregated over sampled coordinates for the selected area; the displayed observations are hourly.')
+
+# Summarize the data used in this view.
+st.subheader("Data summary")
+_summary = weather_data
+_summary_dates = pd.to_datetime(_summary['date'], errors="coerce").dropna()
+_sum_cols = st.columns(3)
+_sum_cols[0].metric("Observations", f"{len(_summary):,}")
+_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
+_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))
+
+st.caption("Temperature: °C; precipitation: mm. SPC frequency uses hours; LOF scores are unitless.")

@@ -27,9 +27,7 @@ st.write(
 )
 
 
-# --------------------------------------------------
-# LOAD RESERVOIR DATA
-# --------------------------------------------------
+# Load reservoir data.
 
 url = (
     "https://biapi.nve.no/magasinstatistikk/api/"
@@ -45,10 +43,9 @@ except (ValueError, RuntimeError, KeyError, OSError) as error:
 area_type, area_number = select_reservoir_area()
 
 
-# --------------------------------------------------
-# USER CONTROLS
-# --------------------------------------------------
+# User controls.
 
+# Select the time span for the correlation analysis.
 period = st.selectbox(
     "Analysis period",
     ["3 months", "6 months", "1 year", "3 years"],
@@ -60,6 +57,7 @@ weather_property = st.selectbox(
     ["Temperature", "Precipitation"],
 )
 
+# Set the time lag between weather and reservoir observations.
 lag = st.slider(
     "Lag (weeks)",
     min_value=0,
@@ -67,6 +65,7 @@ lag = st.slider(
     value=0,
 )
 
+# Choose the number of weeks in each rolling correlation window.
 window_length = st.slider(
     "Rolling window (weeks)",
     min_value=4,
@@ -80,10 +79,9 @@ st.caption(
 )
 
 
-# --------------------------------------------------
-# PREPARE RESERVOIR DATA
-# --------------------------------------------------
+# Prepare reservoir data.
 
+# Filter reservoir filling levels to the selected area.
 reservoir = df_nve[
     (df_nve["Area type"] == area_type)
     & (df_nve["Area number"] == area_number)
@@ -108,10 +106,9 @@ reservoir = (
 )
 
 
-# --------------------------------------------------
-# SELECT ANALYSIS PERIOD
-# --------------------------------------------------
+# Select analysis period.
 
+# Convert the selected period into a number of months.
 period_mapping = {
     "3 months": 3,
     "6 months": 6,
@@ -142,9 +139,7 @@ reservoir = reservoir[
 ].copy()
 
 
-# --------------------------------------------------
-# LOAD WEATHER COORDINATES
-# --------------------------------------------------
+# Load weather coordinates.
 
 try:
     el_coordinates = load_coordinates("el_coordinates.json")
@@ -165,7 +160,7 @@ coordinates = get_area_coordinates(
 )
 
 # Limit to a maximum of 100 coordinates.
-# The same coordinates are used for both weather variables.
+# Use at most 100 coordinates for the weather download.
 coordinates = coordinates[
     ::max(1, (len(coordinates) + 99) // 100)
 ][:100]
@@ -177,11 +172,10 @@ if not coordinates:
     st.stop()
 
 
-# --------------------------------------------------
-# DOWNLOAD AND PREPARE WEEKLY WEATHER DATA
-# --------------------------------------------------
+# Download and prepare weekly weather data.
 
 @st.cache_data(show_spinner=False)
+# Download weather observations and aggregate them by ISO week.
 def load_weekly_weather(
     area_type: str,
     area_number: int,
@@ -235,14 +229,13 @@ def load_weekly_weather(
     return weekly.sort_values("date")
 
 
-# --------------------------------------------------
-# DOWNLOAD BUTTON
-# --------------------------------------------------
+# Download button.
 
 coordinate_tuple = tuple(
     tuple(coord) for coord in coordinates
 )
 
+# Identify the weather data associated with the current settings.
 cache_key = (
     area_type,
     area_number,
@@ -281,6 +274,9 @@ if st.button(
 
 
 # Check whether the downloaded data matches the selection
+
+with st.expander('About the data'):
+    st.markdown('Reservoir filling data are from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/); historical temperature and precipitation data are from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Filling level is a fraction (0–1), temperature is in °C, and precipitation is aggregated to weekly totals in mm. Weather values are based on up to 100 sampled coordinates.')
 if (
     st.session_state.get("correlation_weather_key")
     != cache_key
@@ -299,10 +295,9 @@ if weekly_weather.empty:
     st.stop()
 
 
-# --------------------------------------------------
-# MERGE WEEKLY DATA
-# --------------------------------------------------
+# Merge weekly data.
 
+# Align weather and reservoir data on their weekly dates.
 df = pd.merge(
     reservoir,
     weekly_weather[
@@ -327,9 +322,7 @@ df = (
 )
 
 
-# --------------------------------------------------
-# CHECK DATA AVAILABILITY
-# --------------------------------------------------
+# Check data availability.
 
 if len(df) < window_length + lag:
     st.warning(
@@ -351,10 +344,9 @@ if len(valid_pairs) < window_length:
     st.stop()
 
 
-# --------------------------------------------------
-# CALCULATE SLIDING WINDOW CORRELATION
-# --------------------------------------------------
+# Calculate sliding window correlation.
 
+# Calculate rolling correlations using the selected lag and window.
 result = sliding_window_correlation(
     data=df,
     weather_column=weather_property,
@@ -381,10 +373,9 @@ if result["correlation"].dropna().empty:
 
 
 
-# --------------------------------------------------
-# CREATE PLOTLY FIGURE
-# --------------------------------------------------
+# Create plotly figure.
 
+# Plot reservoir levels, weather, and correlation together.
 fig = make_subplots(
     rows=3,
     cols=1,
@@ -447,19 +438,19 @@ fig.add_hline(
 
 # Axis labels
 fig.update_yaxes(
-    title_text="Filling level",
+    title_text="Filling level (fraction)",
     row=1,
     col=1,
 )
 
 fig.update_yaxes(
-    title_text=weather_property,
+    title_text=("Temperature (°C)" if weather_property == "Temperature" else "Precipitation (mm/week)"),
     row=2,
     col=1,
 )
 
 fig.update_yaxes(
-    title_text="Correlation",
+    title_text="Pearson correlation (unitless)",
     range=[-1, 1],
     row=3,
     col=1,
@@ -492,12 +483,11 @@ st.plotly_chart(
     width="stretch",
 )
 
-# --------------------------------------------------
-# SUMMARY STATISTICS
-# --------------------------------------------------
+# Summary statistics.
 
 st.subheader("Correlation Summary")
 
+# Summarize the available rolling correlation values.
 valid_correlations = result[
     "correlation"
 ].dropna()
@@ -525,3 +515,18 @@ else:
     st.warning(
         "No valid correlations could be calculated."
     )
+
+with st.expander('How to interpret the results'):
+    st.markdown('The bottom plot shows rolling Pearson correlation from −1 to +1. Positive values indicate variables moving together within a window; negative values indicate opposite movement. The lag compares earlier weather with later filling levels. Correlation does not imply causation, and overlapping windows are not independent.')
+
+with st.expander('About the data'):
+    st.markdown('Reservoir filling data are from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/); historical temperature and precipitation data are from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Filling level is a fraction (0–1), temperature is in °C, and precipitation is aggregated to weekly totals in mm. Weather values are based on up to 100 sampled coordinates.')
+
+# Summarize the data used in this view.
+st.subheader("Data summary")
+_summary = df.reset_index()
+_summary_dates = pd.to_datetime(_summary['date'], errors="coerce").dropna()
+_sum_cols = st.columns(3)
+_sum_cols[0].metric("Observations", f"{len(_summary):,}")
+_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
+_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))

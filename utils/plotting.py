@@ -1,3 +1,4 @@
+# Apply the shared styling to a Plotly figure.
 def apply_plot_theme(fig):
     fig.update_layout(
         template="plotly_white",

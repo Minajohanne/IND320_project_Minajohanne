@@ -1,6 +1,7 @@
 import streamlit as st
 
 
+# Display the shared reservoir area selector and return the selection.
 def select_reservoir_area() -> tuple[str, int]:
     """Select reservoir area and preserve the selection across pages."""
     area_numbers = {"EL": [1, 2, 3, 4, 5], "VASS": [1, 2, 3], "NO": [0]}

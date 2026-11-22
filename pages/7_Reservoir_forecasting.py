@@ -34,9 +34,7 @@ from utils.mongoDB import load_electricity_data
 from utils.exchange_rates import get_exchange_rates
 
 
-# --------------------------------------------------
-# Page title
-# --------------------------------------------------
+# Page title.
 
 st.title("Reservoir Filling Forecast")
 
@@ -47,35 +45,30 @@ st.write(
     "exogenous data sources."
 )
 
+# Get the reservoir area selected in the dashboard.
 selected_area, selected_area_number = (select_reservoir_area())
 
 
-# --------------------------------------------------
-# Load reservoir data
-# --------------------------------------------------
+# Load reservoir data.
 
-NVE_URL = (
+url = (
     "https://biapi.nve.no/magasinstatistikk/api/"
     "Magasinstatistikk/HentOffentligData"
 )
 
 try:
-    reservoir_data = load_reservoir_data(NVE_URL)
+    reservoir_data = load_reservoir_data(url)
 except (ValueError, RuntimeError, KeyError, OSError) as error:
     st.error(f"Unable to load data: {error}")
     st.stop()
 
-# Restore the column names expected by SARIMAX_filling
+# Prepare reservoir columns for the forecasting function.
 df_nve = prepare_reservoir_for_forecast(
     reservoir_data
 )
 
 
-# --------------------------------------------------
-# Select reservoir area
-# --------------------------------------------------
-
-
+# Keep data for the selected reservoir area.
 area_data = df_nve[
     (df_nve["omrType"] == selected_area)
     & (df_nve["omrnr"] == selected_area_number)
@@ -97,15 +90,14 @@ area_data["Date"] = pd.to_datetime(
 area_data = area_data.sort_values("Date")
 
 
-# --------------------------------------------------
-# Training period and forecast horizon
-# --------------------------------------------------
+# Training period and forecast horizon.
 
 st.subheader("Forecast settings")
 
 latest_date = area_data["Date"].max().date()
 earliest_date = area_data["Date"].min().date()
 
+# Choose the final training date.
 training_end = st.date_input(
     "Training end date",
     value=latest_date,
@@ -113,6 +105,7 @@ training_end = st.date_input(
     max_value=latest_date,
 )
 
+# Set how many weeks ahead to forecast.
 horizon = st.slider(
     "Forecast horizon (weeks)",
     min_value=1,
@@ -120,6 +113,7 @@ horizon = st.slider(
     value=12,
 )
 
+# Choose the amount of historical training data.
 history = st.slider(
     "Training history (weeks)",
     min_value=52,
@@ -134,9 +128,7 @@ st.caption(
 )
 
 
-# --------------------------------------------------
-# Model parameters
-# --------------------------------------------------
+# Model parameters.
 
 st.subheader("Model parameters")
 
@@ -167,10 +159,7 @@ with col3:
     )
 
 
-# --------------------------------------------------
-# Seasonal parameters
-# --------------------------------------------------
-
+# Seasonal parameters.
 with st.expander("Seasonal parameters"):
 
     col1, col2, col3, col4 = st.columns(4)
@@ -208,12 +197,10 @@ with st.expander("Seasonal parameters"):
         )
 
 
-# --------------------------------------------------
-# Exogenous data sources
-# --------------------------------------------------
-
+# Exogenous data sources.
 st.subheader("Exogenous variables")
 
+# Select optional external data sources for the model.
 available_sources = [
     "Open-Meteo",
     "Norges Bank",
@@ -235,19 +222,14 @@ st.caption(
 )
 
 
-# --------------------------------------------------
-# Generate forecast
-# --------------------------------------------------
+# Generate forecast.
 
+# Run the forecast only when requested.
 if st.button("Generate forecast", type="primary"):
 
     try:
         with st.spinner("Preparing data and forecasting..."):
-
-            # --------------------------------------
-            # Select training period
-            # --------------------------------------
-
+            # Select training period.
             training_end = pd.Timestamp(training_end)
 
             # Use complete ISO weeks only
@@ -269,9 +251,7 @@ if st.button("Generate forecast", type="primary"):
                 df_training["Date"] <= training_end
             ].copy()
 
-            # --------------------------------------
-            # Determine dates for external data
-            # --------------------------------------
+            # Determine dates for external data.
 
             start_date = (
                 training_end
@@ -282,17 +262,13 @@ if st.button("Generate forecast", type="primary"):
                 training_end + pd.Timedelta(days=6)
             ).strftime("%Y-%m-%d")
 
-            # --------------------------------------
-            # Initialize optional sources
-            # --------------------------------------
+            # Initialize optional sources.
 
             weather = None
             electricity = None
             exchange = None
 
-            # --------------------------------------
-            # Open-Meteo
-            # --------------------------------------
+            # Open-meteo.
 
             if "Open-Meteo" in selected_sources:
 
@@ -329,10 +305,7 @@ if st.button("Generate forecast", type="primary"):
                     weather_raw
                 )
 
-            # --------------------------------------
-            # ENTSO-E
-            # --------------------------------------
-
+            # Entso-e.
             if "ENTSO-E" in selected_sources:
 
                 entsoe_raw = pd.DataFrame(
@@ -343,9 +316,7 @@ if st.button("Generate forecast", type="primary"):
                     entsoe_raw,
                     area_number=selected_area_number,
                 )
-            # --------------------------------------
-            # Norges Bank
-            # --------------------------------------
+            # Norges bank.
 
             if "Norges Bank" in selected_sources:
 
@@ -358,10 +329,9 @@ if st.button("Generate forecast", type="primary"):
                     exchange_raw
                 )
 
-            # --------------------------------------
-            # Forecast
-            # --------------------------------------
+            # Forecast.
 
+            # Fit the model and generate the requested forecast.
             forecast = SARIMAX_filling(
                 df=df_training,
                 area_type=selected_area,
@@ -381,9 +351,7 @@ if st.button("Generate forecast", type="primary"):
                 exchange_rates=exchange,
             )
 
-            # --------------------------------------
-            # Historical data for visualization
-            # --------------------------------------
+            # Historical data for visualization.
 
             historical = df_training[
                 (df_training["omrType"] == selected_area)
@@ -399,11 +367,16 @@ if st.button("Generate forecast", type="primary"):
                 .tail(history)
             )
 
-        # ------------------------------------------
-        # Display results
-        # ------------------------------------------
+        # Display results.
 
         st.success("Forecast generated successfully!")
+
+        # Show the size and period of the training and forecast datasets.
+        _forecast_cols = st.columns(3)
+        _forecast_cols[0].metric("Training observations", f"{len(historical):,}")
+        _forecast_cols[1].metric("Forecast rows", f"{len(forecast):,}")
+        _forecast_cols[2].metric("Forecast horizon", f"{horizon} weeks")
+        st.caption("Forecast filling levels are fractions (0–1); 0.5 corresponds to 50%.")
 
         st.subheader("Forecast results")
 
@@ -412,9 +385,7 @@ if st.button("Generate forecast", type="primary"):
             use_container_width=True,
         )
 
-        # ------------------------------------------
-        # Plotly animation
-        # ------------------------------------------
+        # Plotly animation.
 
         st.subheader("Forecast animation")
 
@@ -424,16 +395,17 @@ if st.button("Generate forecast", type="primary"):
         )
 
         fig = apply_plot_theme(fig)
+        fig.update_yaxes(title_text="Filling level (fraction)")
+        fig.update_xaxes(title_text="Date")
 
         st.plotly_chart(
             fig,
             use_container_width=True,
         )
 
-        # ------------------------------------------
-        # Download forecast
-        # ------------------------------------------
+        # Download forecast.
 
+        # Prepare the forecast results for CSV download.
         csv = forecast.to_csv(index=False)
 
         st.download_button(
@@ -449,3 +421,9 @@ if st.button("Generate forecast", type="primary"):
     except Exception as error:
         st.error(f"An unexpected error occurred: {error}")
 
+
+with st.expander('How to interpret the results'):
+    st.markdown('The SNARIMAX model forecasts weekly filling levels using historical observations and optionally other data sources. The forecast is model-based and uncertain, especially further into the future. Exogenous inputs and the chosen training period can influence results; predictions are not guarantees.')
+
+with st.expander('About the data'):
+    st.markdown('Reservoir filling data are from [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Optional explanatory variables come from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api), [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/), and [Norges Bank](https://www.norges-bank.no/). Filling level is a fraction (0–1). External series are aligned to weekly data for model input.')

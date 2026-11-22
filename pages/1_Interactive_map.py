@@ -21,10 +21,7 @@ st.write(
 )
 
 
-# --------------------------------------------------
-# LOAD DATA
-# --------------------------------------------------
-
+# Load reservoir data and geographical boundaries
 url = (
     "https://biapi.nve.no/magasinstatistikk/api/"
     "Magasinstatistikk/HentOffentligData"
@@ -49,19 +46,19 @@ except (ValueError, RuntimeError, KeyError, OSError) as error:
 geojson_vass = create_vass_geojson(geojson_weather)
 
 
-# --------------------------------------------------
-# CREATE GEOJSON FOR WHOLE NORWAY
-# --------------------------------------------------
+# Create geojson for whole norway
 
 @st.cache_data
 def create_norway_geojson(geojson_el):
     """Combine EL areas into one Norway geometry."""
 
+    # Convert each electricity area into a Shapely geometry
     geometries = [
         shape(feature["geometry"])
         for feature in geojson_el["features"]
     ]
 
+    # Merge all areas into one geometry for the national map
     norway_geometry = unary_union(geometries)
 
     return {
@@ -76,9 +73,7 @@ def create_norway_geojson(geojson_el):
     }
 
 
-# --------------------------------------------------
-# DOWNLOAD WEATHER DATA
-# --------------------------------------------------
+# Download weather data
 
 @st.cache_data(show_spinner=False)
 def get_weather_map_data(
@@ -90,6 +85,7 @@ def get_weather_map_data(
 
     results = []
 
+    # Download weather observations for each precipitation region
     for region in nve_coordinates:
 
         df = get_weather_data(
@@ -102,6 +98,7 @@ def get_weather_map_data(
         if df.empty:
             continue
 
+        # Calculate mean temperature and total precipitation for the selected week
         temperature = df["temperature_2m"].mean()
         precipitation = df["precipitation"].sum(min_count=1)
 
@@ -126,9 +123,7 @@ def get_weather_map_data(
     )
 
 
-# --------------------------------------------------
-# SELECT AREA TYPE AND WEEK
-# --------------------------------------------------
+# Select area type and week
 
 area_type = st.radio(
     "Select area type",
@@ -136,6 +131,7 @@ area_type = st.radio(
     horizontal=True,
 )
 
+# Get available year/week combinations, with the newest first
 weeks = (
     df_nve[["Iso year", "Iso week"]]
     .drop_duplicates()
@@ -157,15 +153,14 @@ selected_year, selected_week = st.selectbox(
     format_func=lambda x: f"{x[0]} - Week {x[1]}",
 )
 
+# Keep the selected week available to other pages
 st.session_state["selected_map_week"] = (
     selected_year,
     selected_week,
 )
 
 
-# --------------------------------------------------
-# SELECT COLOUR PROPERTY
-# --------------------------------------------------
+# Select colour property
 
 colour_property = st.selectbox(
     "Colour areas by",
@@ -177,10 +172,9 @@ colour_property = st.selectbox(
 )
 
 
-# --------------------------------------------------
-# PREPARE GEOJSON AND AREA IDENTIFIERS
-# --------------------------------------------------
+# Prepare geojson and area identifiers
 
+# Choose the boundaries and identifiers used to match data to map regions
 if area_type == "EL":
 
     geojson = geojson_el
@@ -211,10 +205,9 @@ else:
     area_ids = ["0"]
 
 
-# --------------------------------------------------
-# PREPARE MAP DATA
-# --------------------------------------------------
+# Prepare map data
 
+# Use reservoir statistics or weather data depending on the selected variable
 if colour_property == "Reservoir filling":
 
     map_data = df_nve[
@@ -239,6 +232,7 @@ else:
 
     weather_property = colour_property
 
+    # Convert the selected ISO week into a date range
     start_date = date.fromisocalendar(
         selected_year,
         selected_week,
@@ -265,6 +259,7 @@ else:
     # Weather data is available by precipitation region.
     # Match each map area to the weather regions it covers.
 
+    # Link electricity and reservoir areas to precipitation regions
     weather_mapping = {
         "EL": {
             "NO 1": ["RØ"],
@@ -285,6 +280,7 @@ else:
 
     results = []
 
+    # Aggregate weather values for each displayed map area
     for area_id in area_ids:
 
         regions = weather_mapping[area_type].get(
@@ -315,9 +311,7 @@ else:
     color_column = weather_property
 
 
-# --------------------------------------------------
-# CHECK DATA
-# --------------------------------------------------
+# Check data
 
 if map_data.empty:
     st.warning(
@@ -328,15 +322,14 @@ if map_data.empty:
 map_data["area_id"] = map_data["area_id"].astype(str)
 
 
-# --------------------------------------------------
-# CREATE MAP
-# --------------------------------------------------
+# Create map
 
 if colour_property == "Temperature":
     colour_scale = "RdBu_r"
 else:
     colour_scale = "Blues"
 
+# Create a choropleth map using the selected boundaries and values
 fig = px.choropleth_map(
     map_data,
     geojson=geojson,
@@ -349,7 +342,7 @@ fig = px.choropleth_map(
     center={"lat": 64, "lon": 12},
     zoom=4,
     hover_name="area_id",
-    labels={color_column: color_column},
+    labels={color_column: {"Filling level": "Filling level (fraction)", "Temperature": "Temperature (°C)", "Precipitation": "Precipitation (mm)"}.get(color_column, color_column)},
 )
 
 # Fixed colour scale for reservoir filling
@@ -366,10 +359,9 @@ fig.update_traces(
 )
 
 
-# --------------------------------------------------
-# HIGHLIGHT SELECTED AREA
-# --------------------------------------------------
+# Highlight selected area
 
+# Read the currently selected area from the shared session state
 selected_area = st.session_state.get("selected_area")
 selected_type = st.session_state.get("selected_area_type")
 
@@ -378,6 +370,7 @@ if (
     and selected_type == area_code
 ):
 
+    # Find the geographical feature corresponding to the selected area
     selected_features = [
         feature
         for feature in geojson["features"]
@@ -395,6 +388,7 @@ if (
             "features": selected_features,
         }
 
+        # Draw a highlighted outline on top of the map
         fig.add_trace(
             go.Choroplethmap(
                 geojson=selected_geojson,
@@ -414,9 +408,7 @@ if (
         )
 
 
-# --------------------------------------------------
-# MAP LAYOUT
-# --------------------------------------------------
+# Map layout
 
 fig.update_layout(
     height=650,
@@ -424,10 +416,9 @@ fig.update_layout(
 )
 
 
-# --------------------------------------------------
-# DISPLAY MAP
-# --------------------------------------------------
+# Display map
 
+# Display the map and capture clicks on map regions
 event = st.plotly_chart(
     fig,
     key=f"interactive_map_{area_code}",
@@ -437,12 +428,11 @@ event = st.plotly_chart(
 )
 
 
-# --------------------------------------------------
-# SAVE SELECTED AREA
-# --------------------------------------------------
+# Save selected area
 
 if event.selection.points:
 
+    # Use the first selected map region
     point = event.selection.points[0]
     clicked_area = point.get("location")
 
@@ -453,6 +443,7 @@ if event.selection.points:
             or area_code != st.session_state.get("selected_area_type")
         ):
 
+            # Save the selected area so other pages can use it
             st.session_state["selected_area"] = clicked_area
             st.session_state["selected_area_type"] = area_code
 
@@ -471,9 +462,7 @@ if event.selection.points:
             st.rerun()
 
 
-# --------------------------------------------------
-# DISPLAY SELECTED AREA
-# --------------------------------------------------
+# Display selected area
 
 if st.session_state.get("selected_area_type") == area_code:
 
@@ -481,3 +470,12 @@ if st.session_state.get("selected_area_type") == area_code:
 
     if selected_area is not None:
         st.write(f"Selected area: {selected_area}")
+
+with st.expander('How to interpret the results'):
+    st.markdown('The map shows values for the selected ISO week. Colours indicate relative values across displayed regions; the legend provides the measurement scale. Reservoir filling is a fraction, not a percentage. Weather conditions are regional estimates, and precipitation totals refer to the selected week.')
+
+with st.expander('About the data'):
+    st.markdown('Reservoir filling and geographical regions are based on [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Weather data are obtained from [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api). Reservoir filling is stored as a fraction (0–1), while temperature is in °C and precipitation is in mm. Weather values are aggregated from sampled locations; these are regional estimates, not measurements at every reservoir.')
+
+# Show the number of regions included in the selected map.
+st.caption(f"Data summary: {len(map_data)} mapped area(s) for ISO week {selected_week}, {selected_year}; {int(map_data[color_column].isna().sum())} missing map values.")

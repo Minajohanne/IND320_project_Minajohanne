@@ -143,9 +143,24 @@ else:
 
     fig.update_layout(
         xaxis_title="Date",
-        yaxis_title=selected_column,
+        yaxis_title={"Filling level": "Filling level (fraction)", "Filling level previous week": "Previous filling level (fraction)", "Change in filling level": "Change in filling level (fraction)"}.get(selected_column, selected_column),
         template="plotly_white",
     )
 
 # Display plot
 st.plotly_chart(fig, width="stretch")
+
+with st.expander('How to interpret the results'):
+    st.markdown('The combined plot min–max scales each variable separately to 0–1, making shapes comparable but not absolute magnitudes. Selecting one variable displays its original unit. Changes in filling level are differences in fractions.')
+
+with st.expander('About the data'):
+    st.markdown('Historical reservoir statistics are provided by [NVE Magasinstatistikk](https://www.nve.no/energi/energisystem/vannkraft/magasinstatistikk/). Filling level is a fraction (0–1); capacity and stored energy are in TWh. The combined chart uses min–max scaling, so its values are unitless.')
+
+# Summarize the data used in this view.
+st.subheader("Data summary")
+_summary = filtered_dat
+_summary_dates = pd.to_datetime(_summary['Date'], errors="coerce").dropna()
+_sum_cols = st.columns(3)
+_sum_cols[0].metric("Observations", f"{len(_summary):,}")
+_sum_cols[1].metric("Missing values", f"{int(_summary.isna().sum().sum()):,}")
+_sum_cols[2].metric("Date range", (f"{_summary_dates.min():%Y-%m-%d} to {_summary_dates.max():%Y-%m-%d}" if not _summary_dates.empty else "N/A"))
