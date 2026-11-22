@@ -227,3 +227,6 @@ No_sync/
 # API cache
 .cache.sqlite
 .cache.sqlite-*
+
+# ignore the images directory 
+images/
