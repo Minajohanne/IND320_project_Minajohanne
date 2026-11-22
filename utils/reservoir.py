@@ -1,50 +1,35 @@
-import requests
+"""Fetch and prepare weekly reservoir statistics from NVE."""
+
 import pandas as pd
-import streamlit as st 
+import requests
+import streamlit as st
+
 
 @st.cache_data
 def get_reservoir_data(url: str) -> pd.DataFrame:
-    """
-    Fetch reservoir data from the NVE API and return a DataFrame.
-
-    Args:
-        url (str): URL of the NVE reservoir data API endpoint.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the reservoir data.
-
-    Raises:
-        requests.exceptions.RequestException: If the API request fails.
-        ValueError: If the response contains invalid JSON.
-    """
+    """Fetch reservoir observations from NVE with useful error messages."""
     try:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
-
         data = response.json()
-        return pd.DataFrame(data)
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError("The NVE API request timed out. Please try again.") from exc
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError("Could not connect to the NVE API. Please try again later.") from exc
+    except ValueError as exc:
+        raise RuntimeError("The NVE API returned invalid JSON data.") from exc
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching reservoir data: {e}")
-        raise
-
-    except ValueError as e:
-        print(f"Error processing API response: {e}")
-        raise
+    if not isinstance(data, list) or not data:
+        raise ValueError("The NVE API returned no reservoir observations.")
+    df = pd.DataFrame(data)
+    if df.empty:
+        raise ValueError("The NVE API returned an empty dataset.")
+    return df
 
 
 def map_names(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Rename the columns of a DataFrame from Norwegian to English.
-
-    Args:
-        df (pd.DataFrame): DataFrame containing Norwegian column names.
-
-    Returns:
-        pd.DataFrame: DataFrame with English column names.
-    """
-    # Map names dictionary
-    map_names = {
+    """Rename NVE's Norwegian column names to English."""
+    column_mapping = {
         "dato_Id": "Date",
         "omrType": "Area type",
         "omrnr": "Area number",
@@ -55,35 +40,29 @@ def map_names(df: pd.DataFrame) -> pd.DataFrame:
         "fylling_TWh": "Stored Energy (TWh)",
         "neste_Publiseringsdato": "Next publication date",
         "fyllingsgrad_forrige_uke": "Filling level previous week",
-        "endring_fyllingsgrad": "Change in filling level"
+        "endring_fyllingsgrad": "Change in filling level",
     }
-
-    # Rename columns
-    df = df.rename(columns=map_names)
-    return df
-
+    return df.rename(columns=column_mapping)
 
 
 @st.cache_data
 def load_reservoir_data(url: str) -> pd.DataFrame:
-    """
-    Load and prepare reservoir statistics from the NVE API.
+    """Load, validate, and sort NVE reservoir statistics."""
+    df = map_names(get_reservoir_data(url))
+    required = ["Date", "Area type", "Area number", "Iso year", "Iso week", "Filling level"]
+    missing = [col for col in required if col not in df.columns]
+    if missing:
+        raise ValueError(f"NVE data is missing required columns: {', '.join(missing)}.")
 
-    Args:
-        url (str): URL of the NVE API endpoint.
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    if df["Date"].isna().any():
+        raise ValueError("NVE data contains invalid or missing dates.")
 
-    Returns:
-        pd.DataFrame: DataFrame containing prepared reservoir data.
-    """
-    df = get_reservoir_data(url)
+    for column in ("Area number", "Iso year", "Iso week", "Filling level"):
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    if df[["Area type", "Area number", "Iso year", "Iso week"]].isna().any().any():
+        raise ValueError("NVE data contains missing or invalid area/week identifiers.")
+    if df["Filling level"].isna().any():
+        raise ValueError("NVE data contains missing or invalid filling levels.")
 
-    # Rename columns
-    df = map_names(df)
-
-    # Convert dates
-    df["Date"] = pd.to_datetime(df["Date"])
-
-    # Sort by date
-    df = df.sort_values("Date")
-
-    return df
+    return df.sort_values("Date").reset_index(drop=True)

@@ -4,6 +4,8 @@ import streamlit as st
 # Area selector
 from utils.area_selector import select_reservoir_area
 
+from utils.plotting import apply_plot_theme
+
 # Forecasting
 from utils.forecasting import (
     SARIMAX_filling,
@@ -25,6 +27,7 @@ from utils.weather import (
     get_weather_data,
 )
 
+
 # Existing data-loading functions
 from utils.reservoir import load_reservoir_data
 from utils.mongoDB import load_electricity_data
@@ -44,6 +47,8 @@ st.write(
     "exogenous data sources."
 )
 
+selected_area, selected_area_number = (select_reservoir_area())
+
 
 # --------------------------------------------------
 # Load reservoir data
@@ -54,7 +59,11 @@ NVE_URL = (
     "Magasinstatistikk/HentOffentligData"
 )
 
-reservoir_data = load_reservoir_data(NVE_URL)
+try:
+    reservoir_data = load_reservoir_data(NVE_URL)
+except (ValueError, RuntimeError, KeyError, OSError) as error:
+    st.error(f"Unable to load data: {error}")
+    st.stop()
 
 # Restore the column names expected by SARIMAX_filling
 df_nve = prepare_reservoir_for_forecast(
@@ -66,11 +75,6 @@ df_nve = prepare_reservoir_for_forecast(
 # Select reservoir area
 # --------------------------------------------------
 
-st.subheader("Reservoir area")
-
-selected_area, selected_area_number = (
-    select_reservoir_area()
-)
 
 area_data = df_nve[
     (df_nve["omrType"] == selected_area)
@@ -102,23 +106,19 @@ st.subheader("Forecast settings")
 latest_date = area_data["Date"].max().date()
 earliest_date = area_data["Date"].min().date()
 
-col1, col2 = st.columns(2)
+training_end = st.date_input(
+    "Training end date",
+    value=latest_date,
+    min_value=earliest_date,
+    max_value=latest_date,
+)
 
-with col1:
-    training_end = st.date_input(
-        "Training end date",
-        value=latest_date,
-        min_value=earliest_date,
-        max_value=latest_date,
-    )
-
-with col2:
-    horizon = st.slider(
-        "Forecast horizon (weeks)",
-        min_value=1,
-        max_value=52,
-        value=12,
-    )
+horizon = st.slider(
+    "Forecast horizon (weeks)",
+    min_value=1,
+    max_value=52,
+    value=12,
+)
 
 history = st.slider(
     "Training history (weeks)",
@@ -343,7 +343,6 @@ if st.button("Generate forecast", type="primary"):
                     entsoe_raw,
                     area_number=selected_area_number,
                 )
-
             # --------------------------------------
             # Norges Bank
             # --------------------------------------
@@ -424,6 +423,8 @@ if st.button("Generate forecast", type="primary"):
             forecast=forecast,
         )
 
+        fig = apply_plot_theme(fig)
+
         st.plotly_chart(
             fig,
             use_container_width=True,
@@ -442,8 +443,9 @@ if st.button("Generate forecast", type="primary"):
             mime="text/csv",
         )
 
-    except (ValueError, KeyError) as error:
+    except (ValueError, RuntimeError, KeyError, OSError) as error:
         st.error(f"Forecast failed: {error}")
 
     except Exception as error:
         st.error(f"An unexpected error occurred: {error}")
+

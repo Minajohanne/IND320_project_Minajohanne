@@ -2,14 +2,30 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 from utils.reservoir import load_reservoir_data
-from utils.area_selector import select_reservoir_area, area_names
+from utils.area_selector import select_reservoir_area
+
 
 st.title("Reservoir Trends")
+
+selected_area, selected_area_number = select_reservoir_area()
+
+# Create area description for plot titles
+if selected_area == "EL":
+    area_description = f"NO {selected_area_number}"
+elif selected_area == "VASS":
+    area_description = f"VASS {selected_area_number}"
+else:
+    area_description = "Whole Norway"
+
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
 # Load reservoir data
-dat = load_reservoir_data(url).copy()
+try:
+    dat = load_reservoir_data(url).copy()
+except (ValueError, RuntimeError, KeyError, OSError) as error:
+    st.error(f"Unable to load data: {error}")
+    st.stop()
 
 # Create year-month values
 dat["month"] = dat["Date"].dt.to_period("M").astype(str)
@@ -30,7 +46,6 @@ selected_column = st.selectbox(
 )
 
 # Shared area selector
-selected_area, selected_area_number = select_reservoir_area()
 
 # Filter by selected area
 area_dat = dat[
@@ -74,7 +89,6 @@ if filtered_dat.empty:
     st.warning("No data available for the selected interval.")
     st.stop()
 
-area_description = area_names[selected_area][selected_area_number]
 
 # Plot all measurement columns
 if selected_column == "All columns":

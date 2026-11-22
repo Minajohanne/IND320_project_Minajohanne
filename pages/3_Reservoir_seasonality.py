@@ -5,9 +5,12 @@ import matplotlib.pyplot as plt
 from utils.reservoir import load_reservoir_data
 from utils.analysis import plot_stl, plot_spectrogram
 from utils.area_selector import select_reservoir_area
-
+from utils.plotting import apply_plot_theme
 
 st.title("Seasonal Analysis")
+
+selected_area, selected_area_number = select_reservoir_area()
+
 
 st.write(
     "Explore seasonal patterns and long-term changes in Norwegian "
@@ -17,11 +20,14 @@ st.write(
 
 # Load reservoir data
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
-dat = load_reservoir_data(url).copy()
+try:
+    dat = load_reservoir_data(url).copy()
+except (ValueError, RuntimeError, KeyError, OSError) as error:
+    st.error(f"Unable to load data: {error}")
+    st.stop()
 
 
 # Shared area selector
-selected_area, selected_area_number = select_reservoir_area()
 
 # Filter by selected area
 filtered_dat = dat[
@@ -99,12 +105,19 @@ with tab1:
         value=True
     )
 
-    fig = plot_stl(
-        filtered_dat,
-        seasonal=seasonal,
-        trend=trend,
-        robust=robust
-    )
+    try:
+        fig = plot_stl(
+            filtered_dat,
+            seasonal=seasonal,
+            trend=trend,
+            robust=robust
+        )
+    
+    except (ValueError, RuntimeError) as error:
+        st.warning(f"Analysis unavailable: {error}")
+        st.stop()
+
+    fig = apply_plot_theme(fig)
 
     st.plotly_chart(fig, use_container_width=True)  
 
@@ -133,11 +146,18 @@ with tab2:
         value=min(52, nperseg - 1)
     )
 
-    fig = plot_spectrogram(
-        filtered_dat,
-        nperseg=nperseg,
-        noverlap=noverlap
-    )
+    try:
+        fig = plot_spectrogram(
+            filtered_dat,
+            nperseg=nperseg,
+            noverlap=noverlap
+        )
+    
+    except (ValueError, RuntimeError) as error:
+        st.warning(f"Analysis unavailable: {error}")
+        st.stop()
+
+    fig = apply_plot_theme(fig)
 
     st.plotly_chart(fig, use_container_width=True)
   

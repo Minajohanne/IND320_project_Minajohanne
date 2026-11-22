@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+from utils.plotting import apply_plot_theme
 import pandas as pd
 import streamlit as st
 from utils.weather import (
@@ -14,6 +14,9 @@ from utils.area_selector import select_reservoir_area
 
 
 st.title("Weather Outlier and Anomaly Analysis")
+
+selected_area, selected_area_number = select_reservoir_area()
+
 
 st.write(
     "Explore unusual weather observations across Norwegian regions. "
@@ -31,8 +34,6 @@ def load_region_coordinates():
 
 el_coordinates, nve_coordinates = load_region_coordinates()
 
-# Shared area selector
-selected_area, selected_area_number = select_reservoir_area()
 
 # Get area name
 area_name = (
@@ -180,13 +181,21 @@ with tab1:
     if len(spc_data) < 2:
         st.warning("Not enough weather observations.")
     else:
-        fig, summary = plot_precipitation_spc(
-            spc_data,
-            cutoff_frequency=1 / cutoff_period,
-            n_std=n_std,
-            area_name=area_name,
-            weather_column=weather_column
-        )
+        try:
+            fig, summary = plot_precipitation_spc(
+                spc_data,
+                cutoff_frequency=1 / cutoff_period,
+                n_std=n_std,
+                area_name=area_name,
+                weather_column=weather_column
+            )
+    
+        except (ValueError, RuntimeError) as error:
+            st.warning(f"Analysis unavailable: {error}")
+            st.stop()
+
+        fig = apply_plot_theme(fig)
+
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -248,13 +257,20 @@ with tab2:
             value=min(20, max_neighbors)
         )
 
-        fig, summary = plot_temperature_lof(
-            lof_data,
-            contamination=contamination,
-            n_neighbors=n_neighbors,
-            area_name=area_name,
-            weather_column=weather_column
-        )
+        try:
+            fig, summary = plot_temperature_lof(
+                lof_data,
+                contamination=contamination,
+                n_neighbors=n_neighbors,
+                area_name=area_name,
+                weather_column=weather_column
+            )
+    
+        except (ValueError, RuntimeError) as error:
+            st.warning(f"Analysis unavailable: {error}")
+            st.stop()
+
+        fig = apply_plot_theme(fig)
 
         st.plotly_chart(
             fig,

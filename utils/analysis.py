@@ -7,6 +7,34 @@ from scipy.fft import dct, idct
 from statsmodels.tsa.seasonal import STL
 from sklearn.neighbors import LocalOutlierFactor
 
+
+
+def validate_time_series(data: pd.DataFrame, required_columns: list[str], min_rows: int = 1) -> pd.DataFrame:
+    """Validate required fields without dropping or interpolating time points."""
+    if not isinstance(data, pd.DataFrame) or data.empty:
+        raise ValueError("No data available for analysis.")
+    missing = [column for column in required_columns if column not in data.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}")
+    if len(data) < min_rows:
+        raise ValueError(f"Not enough observations: at least {min_rows} are required.")
+    return data.copy()
+
+
+def require_complete_series(data: pd.DataFrame, value_column: str, date_column: str = "Date") -> pd.DataFrame:
+    """Require a complete, weekly series for analyses that cannot handle NaN."""
+    df = validate_time_series(data, [date_column, value_column])
+    df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
+    df[value_column] = pd.to_numeric(df[value_column], errors="coerce")
+    if df[[date_column, value_column]].isna().any().any() or not np.isfinite(df[value_column]).all():
+        raise ValueError("The time series contains missing or invalid dates/values.")
+    df = df.sort_values(date_column)
+    if df[date_column].duplicated().any():
+        raise ValueError("Duplicate dates found in the time series.")
+    if len(df) > 1 and not df[date_column].diff().dropna().eq(pd.Timedelta(weeks=1)).all():
+        raise ValueError("The time series has missing or irregular weeks.")
+    return df.reset_index(drop=True)
+
 def plot_stl(
     data: pd.DataFrame,
     seasonal: int = 13,
@@ -32,8 +60,13 @@ def plot_stl(
     go.Figure
         Plotly figure showing the STL decomposition.
     """
-    # Sort data chronologically
-    data = data.sort_values("Date").reset_index(drop=True)
+    if seasonal < 3 or seasonal % 2 == 0 or trend < 3 or trend % 2 == 0:
+        raise ValueError("STL seasonal and trend windows must be odd integers >= 3.")
+    if trend <= 52:
+        raise ValueError("STL trend window must be greater than the seasonal period (52 weeks).")
+    data = require_complete_series(data, "Filling level")
+    if len(data) < 104:
+        raise ValueError("STL requires at least 104 weekly observations (two years).")
 
     stl = STL(
         data["Filling level"],
@@ -112,8 +145,11 @@ def plot_spectrogram(
     go.Figure
         Plotly figure showing the spectrogram.
     """
-    # Sort data chronologically
-    data = data.sort_values("Date").reset_index(drop=True)
+    if nperseg < 2 or noverlap < 0 or noverlap >= nperseg:
+        raise ValueError("Spectrogram requires nperseg >= 2 and 0 <= noverlap < nperseg.")
+    data = require_complete_series(data, "Filling level")
+    if len(data) < nperseg:
+        raise ValueError(f"Spectrogram requires at least {nperseg} weekly observations.")
 
     # Extract filling levels
     y = data["Filling level"].to_numpy()
@@ -189,10 +225,28 @@ def plot_precipitation_spc(
 
     property_name, unit = weather_labels[weather_column]
 
+    validate_time_series(df, ["date", weather_column])
+    if not np.isfinite(cutoff_frequency) or not 0 < cutoff_frequency < 0.5:
+        raise ValueError("DCT cutoff frequency must be between 0 and 0.5 cycles per observation.")
+    if not np.isfinite(n_std) or n_std <= 0:
+        raise ValueError("Number of standard deviations must be positive.")
     # Remove missing observations
     df = df.dropna(
         subset=["date", weather_column]
     ).copy().reset_index(drop=True)
+
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df[weather_column] = pd.to_numeric(df[weather_column], errors="coerce")
+    df = df.dropna(subset=["date", weather_column])
+    df = df[np.isfinite(df[weather_column])].sort_values("date")
+    if len(df) < 3:
+        raise ValueError("SPC requires at least 3 valid weather observations.")
+    if df["date"].duplicated().any():
+        raise ValueError("Duplicate timestamps found in SPC weather data.")
+    # DCT assumes equally spaced observations.
+    intervals = df["date"].diff().dropna()
+    if intervals.nunique() > 1:
+        raise ValueError("SPC requires regularly spaced weather observations; check missing timestamps.")
 
     # Extract weather observations and dates
     values = df[weather_column].to_numpy()
@@ -350,10 +404,22 @@ def plot_temperature_lof(
 
     property_name, unit = weather_labels[weather_column]
 
+    validate_time_series(df, ["date", weather_column])
+    if not 0 < contamination <= 0.5:
+        raise ValueError("LOF contamination must be between 0 and 0.5.")
+    if n_neighbors < 1:
+        raise ValueError("LOF n_neighbors must be at least 1.")
     # Remove missing values and reset index
     df = df.dropna(
         subset=["date", weather_column]
     ).copy().reset_index(drop=True)
+
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df[weather_column] = pd.to_numeric(df[weather_column], errors="coerce")
+    df = df.dropna(subset=["date", weather_column])
+    df = df[np.isfinite(df[weather_column])].reset_index(drop=True)
+    if len(df) <= n_neighbors:
+        raise ValueError(f"LOF requires more than {n_neighbors} valid observations.")
 
     # Extract selected weather property as a 2D array
     values = df[[weather_column]].to_numpy()
@@ -436,3 +502,40 @@ def plot_temperature_lof(
     })
 
     return fig, outlier_summary
+
+
+
+def sliding_window_correlation(
+    data: pd.DataFrame,
+    weather_column: str,
+    lag: int = 0,
+    window: int = 24,
+) -> pd.DataFrame:
+    """Calculate rolling correlation between weather and reservoir filling."""
+
+    df = validate_time_series(data, ["Filling level", weather_column])
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError("Correlation requires a DatetimeIndex with weekly dates.")
+    if df.index.has_duplicates:
+        raise ValueError("Duplicate weekly dates found in correlation data.")
+    if lag < 0 or window < 2:
+        raise ValueError("Lag must be nonnegative and rolling window must be at least 2 weeks.")
+    df = df.sort_index()
+    if len(df) < window + lag:
+        raise ValueError("Not enough weekly observations for the selected window and lag.")
+
+    # Ensure that each row represents one calendar week
+    df = df.asfreq("W-MON")
+
+    # Compare reservoir filling with weather from previous weeks
+    df["weather_lagged"] = df[weather_column].shift(lag)
+
+    # Calculate rolling Pearson correlation
+    df["correlation"] = (
+        df["Filling level"]
+        .rolling(window=window, min_periods=window)
+        .corr(df["weather_lagged"])
+    )
+
+    return df
+

@@ -5,15 +5,20 @@ import streamlit as st
 from utils.reservoir import load_reservoir_data
 from utils.area_selector import select_reservoir_area
 
-
 st.title("Reservoir data table")
+
+selected_area, selected_area_number = select_reservoir_area()
+
 
 url = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
-dat = load_reservoir_data(url).copy()
+try:
+    dat = load_reservoir_data(url).copy()
+except (ValueError, RuntimeError, KeyError, OSError) as error:
+    st.error(f"Unable to load data: {error}")
+    st.stop()
 
 # Select area type and number
-selected_area, selected_area_number = select_reservoir_area()
 
 # Filter by selected area type and number
 area_dat = dat[

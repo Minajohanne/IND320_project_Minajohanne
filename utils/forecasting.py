@@ -1,5 +1,6 @@
 
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 
 from river import time_series, metrics
@@ -82,6 +83,17 @@ def SARIMAX_filling(
             f"Invalid area number for {area_type}."
         )
 
+    if df is None or df.empty:
+        raise ValueError("No reservoir data available for forecasting.")
+    required = ["omrType", "omrnr", "iso_aar", "iso_uke", "fyllingsgrad"]
+    missing = [col for col in required if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing reservoir columns: {', '.join(missing)}.")
+    if any(not isinstance(v, int) or v < 0 for v in (p, d, q, sp, sd, sq)):
+        raise ValueError("SNARIMAX model orders must be non-negative integers.")
+    if not isinstance(m, int) or m < 1:
+        raise ValueError("Seasonal period must be a positive integer.")
+
     # --------------------------------------------------
     # Select reservoir area
     # --------------------------------------------------
@@ -136,6 +148,10 @@ def SARIMAX_filling(
         if source_df is None:
             continue
 
+        if source_df.empty:
+            raise ValueError(f"No {source_name} data available.")
+        if any(key not in source_df.columns for key in keys):
+            raise ValueError(f"Missing ISO year/week columns in {source_name}.")
         source = source_df.copy()
 
         # Select numerical features
@@ -193,7 +209,8 @@ def SARIMAX_filling(
             f"Requested {history} weeks."
         )
 
-    if data["fyllingsgrad"].isna().any():
+    data["fyllingsgrad"] = pd.to_numeric(data["fyllingsgrad"], errors="coerce")
+    if not np.isfinite(data["fyllingsgrad"].to_numpy(dtype=float)).all():
         raise ValueError(
             "Missing reservoir filling values."
         )
@@ -208,7 +225,7 @@ def SARIMAX_filling(
 
     # Check missing exogenous values
     if feature_columns:
-        if data[feature_columns].isna().any().any():
+        if not np.isfinite(data[feature_columns].to_numpy(dtype=float)).all():
             raise ValueError(
                 "Missing exogenous values. Check that all "
                 "selected data sources cover the history period."
@@ -283,6 +300,9 @@ def SARIMAX_filling(
         horizon=horizon,
         xs=future_xs,
     )
+
+    if len(predictions) != horizon or not np.isfinite(np.asarray(predictions, dtype=float)).all():
+        raise ValueError("Forecast returned missing or invalid predictions.")
 
     # --------------------------------------------------
     # Historical evaluation
