@@ -1,5 +1,3 @@
-"""Load regional coordinates and download hourly ERA5 weather observations."""
-
 import json
 import time
 from pathlib import Path

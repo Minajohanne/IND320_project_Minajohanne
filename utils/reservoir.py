@@ -1,12 +1,10 @@
-"""Fetch and prepare weekly reservoir statistics from NVE."""
-
 import pandas as pd
 import requests
 import streamlit as st
 
 
 # Fetch reservoir statistics from the NVE API.
-@st.cache_data
+@st.cache_data(ttl=3600)
 def get_reservoir_data(url: str) -> pd.DataFrame:
     """Fetch reservoir observations from NVE with useful error messages."""
     try:
