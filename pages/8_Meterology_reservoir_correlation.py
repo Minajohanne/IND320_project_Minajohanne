@@ -230,7 +230,6 @@ def load_weekly_weather(
 
 
 # Download button.
-
 coordinate_tuple = tuple(
     tuple(coord) for coord in coordinates
 )

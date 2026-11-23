@@ -1,5 +1,3 @@
-"""MongoDB Atlas connection and electricity data loading."""
-
 import streamlit as st
 from pymongo import MongoClient
 from pymongo.errors import (

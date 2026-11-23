@@ -48,7 +48,7 @@ def map_names(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Load and prepare reservoir observations.
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_reservoir_data(url: str) -> pd.DataFrame:
     """Load, validate, and sort NVE reservoir statistics."""
     df = map_names(get_reservoir_data(url))

@@ -95,10 +95,7 @@ def SARIMAX_filling(
     if not isinstance(m, int) or m < 1:
         raise ValueError("Seasonal period must be a positive integer.")
 
-    # --------------------------------------------------
     # Select reservoir area
-    # --------------------------------------------------
-
     data = df[
         (df["omrType"] == area_type)
         & (df["omrnr"] == area_number)
@@ -120,10 +117,7 @@ def SARIMAX_filling(
 
     data = data.sort_values("Date")
 
-    # --------------------------------------------------
     # Select training end date
-    # --------------------------------------------------
-
     if end_date is not None:
         end_date = pd.Timestamp(end_date)
 
@@ -131,10 +125,7 @@ def SARIMAX_filling(
             data["Date"] <= end_date
         ].copy()
 
-    # --------------------------------------------------
     # Merge optional exogenous data sources
-    # --------------------------------------------------
-
     sources = {
         "weather": weather_data,
         "electricity": electricity_data,
@@ -194,10 +185,7 @@ def SARIMAX_filling(
 
         feature_columns.extend(new_features)
 
-    # --------------------------------------------------
     # Select historical observations
-    # --------------------------------------------------
-
     data = (
         data.sort_values("Date")
         .tail(history)
@@ -232,10 +220,7 @@ def SARIMAX_filling(
                 "selected data sources cover the history period."
             )
 
-    # --------------------------------------------------
     # Create SNARIMAX model
-    # --------------------------------------------------
-
     model = time_series.SNARIMAX(
         p=p,
         d=d,
@@ -246,10 +231,7 @@ def SARIMAX_filling(
         sq=sq,
     )
 
-    # --------------------------------------------------
     # Split training and test data
-    # --------------------------------------------------
-
     if evaluate:
         train = data.iloc[:-horizon]
         test = data.iloc[-horizon:]
@@ -257,10 +239,7 @@ def SARIMAX_filling(
         train = data
         test = None
 
-    # --------------------------------------------------
     # Train model sequentially
-    # --------------------------------------------------
-
     for _, row in train.iterrows():
 
         y = float(row["fyllingsgrad"])
@@ -272,10 +251,7 @@ def SARIMAX_filling(
 
         model.learn_one(y, x=x)
 
-    # --------------------------------------------------
     # Prepare future exogenous variables
-    # --------------------------------------------------
-
     if feature_columns:
 
         # Persistence assumption:
@@ -293,10 +269,7 @@ def SARIMAX_filling(
     else:
         future_xs = None
 
-    # --------------------------------------------------
     # Forecast
-    # --------------------------------------------------
-
     predictions = model.forecast(
         horizon=horizon,
         xs=future_xs,
@@ -305,10 +278,7 @@ def SARIMAX_filling(
     if len(predictions) != horizon or not np.isfinite(np.asarray(predictions, dtype=float)).all():
         raise ValueError("Forecast returned missing or invalid predictions.")
 
-    # --------------------------------------------------
     # Historical evaluation
-    # --------------------------------------------------
-
     if evaluate:
 
         mae = metrics.MAE()
@@ -331,10 +301,7 @@ def SARIMAX_filling(
             "Predicted filling level": predictions,
         })
 
-    # --------------------------------------------------
     # Generate future dates
-    # --------------------------------------------------
-
     future_dates = pd.date_range(
         start=(
             data["Date"].iloc[-1]
@@ -386,10 +353,7 @@ def plot_forecast_animation(
         + forecast["Predicted filling level"].tolist()
     )
 
-    # --------------------------------------------------
     # Animation frames
-    # --------------------------------------------------
-
     frames = []
 
     for step in range(1, len(forecast) + 1):
@@ -413,10 +377,7 @@ def plot_forecast_animation(
             )
         )
 
-    # --------------------------------------------------
     # Create figure
-    # --------------------------------------------------
-
     fig = go.Figure(
         data=[
             go.Scatter(
@@ -440,10 +401,7 @@ def plot_forecast_animation(
         frames=frames,
     )
 
-    # --------------------------------------------------
     # Layout and animation controls
-    # --------------------------------------------------
-
     fig.update_layout(
         title="Reservoir Filling Forecast",
         xaxis_title="Date",

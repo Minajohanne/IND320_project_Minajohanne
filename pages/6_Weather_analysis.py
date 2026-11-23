@@ -26,7 +26,6 @@ st.write(
 
 # Load sampled coordinates
 @st.cache_data
-# Cache coordinates for the electricity and weather regions.
 def load_region_coordinates():
     el = load_coordinates("el_coordinates.json")
     nve = load_coordinates("nve_coordinates.json")
