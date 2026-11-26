@@ -159,11 +159,8 @@ coordinates = get_area_coordinates(
     nve_coordinates=nve_coordinates,
 )
 
-# Limit to a maximum of 100 coordinates.
-# Use at most 100 coordinates for the weather download.
 coordinates = coordinates[
-    ::max(1, (len(coordinates) + 99) // 100)
-][:100]
+    ::max(1, (len(coordinates) + 99) // 100)]
 
 if not coordinates:
     st.warning(
